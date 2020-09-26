@@ -4,10 +4,11 @@ import pickle
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from tools_for_todoist.credentials import CREDENTIALS_DIR
 
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 
-CREDENTIALS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'credentials')
+
 CREDENTIALS_JSON_PATH = os.path.join(CREDENTIALS_DIR, 'google-calendar-credentials.json')
 TOKEN_CACHE_PATH = os.path.join(CREDENTIALS_DIR, 'google-calendar-token-cache.pkl')
 

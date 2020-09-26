@@ -30,4 +30,5 @@ MANIFEST
 .vscode
 
 tools_for_todoist/secrets.py
-credentials
+tools_for_todoist/credentials/*
+!tools_for_todoist/credentials/__init__.py
