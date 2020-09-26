@@ -27,5 +27,8 @@ share/python-wheels/
 MANIFEST
 
 .idea
-tools_for_todoist/secrets.py
+.vscode
 
+tools_for_todoist/secrets.py
+tools_for_todoist/credentials/*
+!tools_for_todoist/credentials/__init__.py

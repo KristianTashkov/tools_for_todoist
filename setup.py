@@ -35,6 +35,8 @@ setuptools.setup(
     python_requires='>=3.7',
     install_requires=[
         'todoist-python==8.1.2',
-    ]
-
+        'google-api-python-client==1.12.2',
+        'google-auth-httplib2==0.0.4',
+        'google-auth-oauthlib==0.4.1',
+    ],
 )
