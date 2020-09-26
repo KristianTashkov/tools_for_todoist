@@ -1,14 +1,14 @@
 """
 Copyright (C) 2020-2020 Kristian Tashkov <kristian.tashkov@gmail.com>
 
-This file is part of Todoist Helper.
+This file is part of "Tools for Todoist".
 
-Todoist Helper is free software: you can redistribute it and/or modify
+"Tools for Todoist" is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by the
 Free Software Foundation, either version 3 of the License, or (at your
 option) any later version.
 
-Todoist Helper is distributed in the hope that it will be useful, but
+"Tools for Todoist" is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
 more details.
@@ -23,14 +23,18 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="Todoist Helper",
+    name="Tools for Todoist",
     version="0.0.1",
     author="Kristian Tashkov",
     author_email="kristian.tashkov@gmail.com",
-    description="Todoist helper functions",
+    description="Tools for todoist",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/KristianTashkov/todoist_helper",
+    url="https://github.com/KristianTashkov/tools_for_todoist",
     packages=setuptools.find_packages(),
     python_requires='>=3.7',
+    install_requires=[
+        'todoist-python==8.1.2',
+    ]
+
 )

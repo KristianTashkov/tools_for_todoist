@@ -27,5 +27,5 @@ share/python-wheels/
 MANIFEST
 
 .idea
-todoist_helper/secrets.py
+tools_for_todoist/secrets.py
 
