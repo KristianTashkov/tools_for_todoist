@@ -1,6 +1,4 @@
-import os
 import pickle
-import warnings
 
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -13,9 +11,6 @@ TOKEN_CACHE_PATH = 'token_cache.pkl'
 
 
 def _save_credentials(token):
-    if TOKEN_CACHE_PATH is None:
-        warnings.warn('TOKEN_CACHE_PATH is not set in settings.py')
-        return
     with open(TOKEN_CACHE_PATH, 'wb') as token_io:
         pickle.dump(token, token_io)
     
