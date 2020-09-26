@@ -4,11 +4,12 @@ import warnings
 
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build                                                                                                                                               
-
-from todoist_helper.settings import CREDENTIALS_JSON_PATH, TOKEN_CACHE_PATH
+from googleapiclient.discovery import build
 
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+
+CREDENTIALS_JSON_PATH = 'credentials.json'
+TOKEN_CACHE_PATH = 'token_cache.pkl'
 
 
 def _save_credentials(token):
@@ -29,36 +30,21 @@ def _do_auth():
             token.refresh(Request())
             _save_credentials(token)
             return token
-
-    if CREDENTIALS_JSON_PATH is None:
-        raise ValueError('Set CREDENTIALS_JSON_PATH in settings.py to the path of the credentials.json file')
     flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_JSON_PATH, SCOPES)
     token = flow.run_local_server(port=0)
     _save_credentials(token)
     return token
 
 
-class CalendarApi:
+class CalendarAPI:
     def __init__(self):
-        self._token = None
-        self._calendar_service = None
-    
-    def auth(self):
-        if self._token is not None:
-            raise ValueError('CalendarApi object is already authenticated?')
-        self._token  = _do_auth()
-        self._calendar_service = build('calendar', 'v3', credentials=self._token)
-    
-    @property
-    def calendar_service(self):
-        if self._token is None:
-            raise ValueError('Call auth first')
-        return self._calendar_service
+        token  = _do_auth()
+        self._calendar_service = build('calendar', 'v3', credentials=token)
 
     def iterate_events(self, calendar_id, **kwargs):
-        request = self.calendar_service.events().list(calendarId=calendar_id, **kwargs)
+        request = self._calendar_service.events().list(calendarId=calendar_id, **kwargs)
         while request is not None:
             response = request.execute()
             for item in response['items']:
                 yield item
-            request = self.calendar_service.events().list_next(request, response)
+            request = self._calendar_service.events().list_next(request, response)
