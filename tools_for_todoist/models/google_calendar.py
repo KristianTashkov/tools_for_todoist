@@ -36,7 +36,7 @@ def _do_auth():
     return token
 
 
-class CalendarAPI:
+class GoogleCalendarAPI:
     def __init__(self):
         token  = _do_auth()
         self._calendar_service = build('calendar', 'v3', credentials=token)
