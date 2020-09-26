@@ -29,7 +29,5 @@ MANIFEST
 .idea
 .vscode
 
-#credentials
 tools_for_todoist/secrets.py
-credentials.json
-token_cache.pkl
+credentials

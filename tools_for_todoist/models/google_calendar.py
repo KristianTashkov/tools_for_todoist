@@ -1,3 +1,4 @@
+import os
 import pickle
 
 from google.auth.transport.requests import Request
@@ -6,8 +7,9 @@ from googleapiclient.discovery import build
 
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 
-CREDENTIALS_JSON_PATH = 'credentials.json'
-TOKEN_CACHE_PATH = 'token_cache.pkl'
+CREDENTIALS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'credentials')
+CREDENTIALS_JSON_PATH = os.path.join(CREDENTIALS_DIR, 'google-calendar-credentials.json')
+TOKEN_CACHE_PATH = os.path.join(CREDENTIALS_DIR, 'google-calendar-token-cache.pkl')
 
 
 def _save_credentials(token):
