@@ -18,12 +18,14 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 from todoist.api import TodoistAPI
 
-from tools_for_todoist.secrets import TODOIST_API_TOKEN
+from tools_for_todoist.credentials import TODOIST_API_TOKEN_PATH
 
 
 class Todoist:
     def __init__(self, active_project_name):
-        self.api = TodoistAPI(TODOIST_API_TOKEN)
+        with open(TODOIST_API_TOKEN_PATH) as file:
+            token = file.readline().strip()
+        self.api = TodoistAPI(token)
         self.api.reset_state()
         self.items = {}
         self._initial_sync(active_project_name)
