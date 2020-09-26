@@ -15,7 +15,7 @@ def _save_credentials(token):
     
 
 def _do_auth():
-    if TOKEN_CACHE_PATH is not None and os.path.exists(TOKEN_CACHE_PATH):
+    if os.path.exists(TOKEN_CACHE_PATH):
         with open(TOKEN_CACHE_PATH, 'rb') as token_io:
             token = pickle.load(token_io)
         if token.valid:
