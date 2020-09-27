@@ -19,6 +19,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 from todoist.api import TodoistAPI
 
 from tools_for_todoist.credentials import TODOIST_API_TOKEN_PATH
+from tools_for_todoist.models.item import TodoistItem
 
 
 class Todoist:
@@ -27,29 +28,38 @@ class Todoist:
             token = file.readline().strip()
         self.api = TodoistAPI(token)
         self.api.reset_state()
-        self.items = {}
+        self._items = {}
         self._initial_sync(active_project_name)
 
     def _initial_sync(self, active_project_name):
         self._initial_result = self.api.sync()
-        self._active_project_id = [
+        self.active_project_id = [
             x for x in self._initial_result['projects']
             if x['name'] == active_project_name
         ][0]['id']
         for item in self._initial_result['items']:
-            if item['project_id'] != self._active_project_id:
+            if item['project_id'] != self.active_project_id:
                 continue
-            self.items[item['id']] = item
+            self._items[item['id']] = TodoistItem.from_raw(self, item)
 
     def _safety_filter_item(self, item):
         if item['type'] == 'item_add':
-            return item['args']['project_id'] == self._active_project_id
+            return item['args']['project_id'] == self.active_project_id
         if item['type'] == 'item_update':
-            return self.items[item['args']['id']]['project_id'] == self._active_project_id
+            return self._items[item['args']['id']].project_id == self.active_project_id
         return False
 
-    def add_item(self, name, priority=1):
-        self.api.items.add(name, project_id=self._active_project_id, priority=priority)
+    def get_item_by_id(self, id):
+        return self._items.get(id)
+
+    def add_item(self, item):
+        item_raw = self.api.items.add(
+            item.content, project_id=item.project_id, priority=item.priority)
+        self._items[item_raw['id']] = item
+        return item_raw
+
+    def update_item(self, item, **kwargs):
+        self.api.items.update(item.id, **kwargs)
 
     def commit(self):
         filtered_items = []
@@ -59,5 +69,10 @@ class Todoist:
                 continue
             filtered_items.append(item)
         self.api.queue = filtered_items
-        self.api.commit()
+        result = self.api.commit()
+        for temporary_key in result['temp_id_mapping']:
+            item = self._items.pop(temporary_key)
+            item.id = result['temp_id_mapping'][temporary_key]
+            self._items[item.id] = item
+        return result
 
