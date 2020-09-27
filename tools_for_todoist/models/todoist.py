@@ -49,6 +49,16 @@ class Todoist:
             return self._items[item['args']['id']].project_id == self.active_project_id
         return False
 
+    def _update_items(self, raw_updated_items):
+        for item in raw_updated_items:
+            if item['in_history'] == 1 or item['is_deleted'] == 1:
+                self._items.pop(item['id'], None)
+            elif item['id'] not in self._items:
+                new_item = TodoistItem.from_raw(self, item)
+                self._items[new_item.id] = new_item
+            else:
+                self.get_item_by_id(item['id']).update_from_raw(item)
+
     def get_item_by_id(self, id):
         return self._items.get(id)
 
@@ -61,7 +71,7 @@ class Todoist:
     def update_item(self, item, **kwargs):
         self.api.items.update(item.id, **kwargs)
 
-    def commit(self):
+    def sync(self):
         filtered_items = []
         for item in self.api.queue:
             if not self._safety_filter_item(item):
@@ -69,10 +79,19 @@ class Todoist:
                 continue
             filtered_items.append(item)
         self.api.queue = filtered_items
-        result = self.api.commit()
+        if len(self.api.queue) > 0:
+            print("Sending commands:", self.api.queue)
+            result = self.api.commit()
+        else:
+            result = self.api.sync()
         for temporary_key in result['temp_id_mapping']:
             item = self._items.pop(temporary_key)
             item.id = result['temp_id_mapping'][temporary_key]
             self._items[item.id] = item
+        active_project_item_updates = [
+            x for x in result['items']
+            if x['project_id'] == self.active_project_id or x['project_id'] == 0
+        ]
+        self._update_items(active_project_item_updates)
         return result
 

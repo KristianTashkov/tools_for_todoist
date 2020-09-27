@@ -31,10 +31,15 @@ class TodoistItem:
     @staticmethod
     def from_raw(todoist, raw):
         item = TodoistItem(todoist, raw['content'], raw['project_id'])
-        item._raw = raw
-        item.priority = raw['priority']
         item.id = raw['id']
+        item.update_from_raw(raw)
         return item
+
+    def update_from_raw(self, raw):
+        self._raw = raw
+        self.priority = raw['priority']
+        self.content = raw['content']
+        self.project_id = raw['project_id']
 
     def save(self):
         if self.id == -1:
