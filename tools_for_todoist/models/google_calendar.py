@@ -57,19 +57,18 @@ class GoogleCalendar:
         self._calendar_id = calendar_id
         self.api = build('calendar', 'v3', credentials=token)
         self._raw_events = []
-        self.events = []
+        self.events = {}
         self.sync_token = None
         self._initial_sync()
 
     def _initial_sync(self):
-        self._sync()
+        self.sync()
         for event in self._raw_events:
-            self.events.append(CalendarEvent.from_raw(event))
+            self.events[event['id']] = CalendarEvent.from_raw(event)
 
-    def _sync(self):
+    def sync(self):
         request = self.api.events().list(
-            calendarId=self._calendar_id, maxResults=1, singleEvents=True,
-            syncToken=self.sync_token
+            calendarId=self._calendar_id, syncToken=self.sync_token
         )
         self._raw_events = []
         while request is not None:
@@ -77,3 +76,11 @@ class GoogleCalendar:
             self._raw_events.extend(response['items'])
             request = self.api.events().list_next(request, response)
         self.sync_token = response['nextSyncToken']
+
+        for event in self._raw_events:
+            if event['status'] == 'cancelled':
+                self.events.pop(event['id'], None)
+            elif event['id'] not in self.events:
+                self.events[event['id']] = CalendarEvent.from_raw(event)
+            else:
+                self.events[event['id']].update_from_raw(event)

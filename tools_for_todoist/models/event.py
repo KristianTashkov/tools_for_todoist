@@ -21,12 +21,17 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 class CalendarEvent:
     def __init__(self):
         self._raw = None
+        self.id = -1
 
     @staticmethod
     def from_raw(raw):
         event = CalendarEvent()
-        event._raw = raw
+        event._id = raw['id']
+        event.update_from_raw(raw)
         return event
 
+    def update_from_raw(self, raw):
+        self._raw = raw
+
     def __repr__(self):
-        return f"{self._raw['summary']}: {self._raw['start']} - {self._raw['end']}"
+        return f"{self.id}: {self._raw['summary']}, {self._raw['start']} - {self._raw['end']}"
