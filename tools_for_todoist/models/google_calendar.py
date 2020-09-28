@@ -25,6 +25,7 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from tools_for_todoist.credentials import CREDENTIALS_JSON_PATH, TOKEN_CACHE_PATH
+from tools_for_todoist.models.event import CalendarEvent
 
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 
@@ -50,15 +51,29 @@ def _do_auth():
     return token
 
 
-class GoogleCalendarAPI:
-    def __init__(self):
-        token  = _do_auth()
-        self._calendar_service = build('calendar', 'v3', credentials=token)
+class GoogleCalendar:
+    def __init__(self, calendar_id):
+        token = _do_auth()
+        self._calendar_id = calendar_id
+        self.api = build('calendar', 'v3', credentials=token)
+        self._raw_events = []
+        self.events = []
+        self.sync_token = None
+        self._initial_sync()
 
-    def iterate_events(self, calendar_id, **kwargs):
-        request = self._calendar_service.events().list(calendarId=calendar_id, **kwargs)
+    def _initial_sync(self):
+        self._sync()
+        for event in self._raw_events:
+            self.events.append(CalendarEvent.from_raw(event))
+
+    def _sync(self):
+        request = self.api.events().list(
+            calendarId=self._calendar_id, maxResults=1, singleEvents=True,
+            syncToken=self.sync_token
+        )
+        self._raw_events = []
         while request is not None:
             response = request.execute()
-            for item in response['items']:
-                yield item
-            request = self._calendar_service.events().list_next(request, response)
+            self._raw_events.extend(response['items'])
+            request = self.api.events().list_next(request, response)
+        self.sync_token = response['nextSyncToken']
