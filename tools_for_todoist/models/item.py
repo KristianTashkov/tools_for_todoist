@@ -26,7 +26,7 @@ class TodoistItem:
 
         self.id = -1
         self.priority = 1
-        self.due = None
+        self._due = None
         self._raw = None
 
     @staticmethod
@@ -40,38 +40,38 @@ class TodoistItem:
         self._raw = raw
         self.content = raw['content']
         self.priority = raw['priority']
-        self.due = raw['due']
+        self._due = raw['due']
         self.project_id = raw['project_id']
 
     def next_due_date(self):
-        if self.due is None:
+        if self._due is None:
             return None
         format = '%Y-%m-%d'
-        if 'T' in self.due['date']:
+        if 'T' in self._due['date']:
             format += 'T%H:%M:%S'
-        if 'Z' in self.due['date']:
+        if 'Z' in self._due['date']:
             format += 'Z'
-        return datetime.strptime(self.due['date'], format)
+        return datetime.strptime(self._due['date'], format)
 
     def is_recurring(self):
-        return self.due is not None and self.due['is_recurring']
+        return self._due is not None and self._due['is_recurring']
 
     def get_due_string(self):
-        if self.due is None:
+        if self._due is None:
             return None
-        return self.due['string']
+        return self._due['string']
 
     def set_due_by_string(self, due_string):
-        self.due = {
+        self._due = {
             'string': due_string
         }
 
     def set_next_occurrence(self, utc_date, include_time=True):
-        self.due = {} if self.due is None else self.due.copy()
+        self._due = {} if self._due is None else self._due.copy()
         next_date = datetime.strftime(utc_date, '%Y-%m-%d')
         if include_time:
             next_date += 'T' + datetime.strftime(utc_date, '%H:%M:%S')
-        self.due['date'] = next_date
+        self._due['date'] = next_date
 
     def save(self):
         if self.id == -1:
@@ -84,8 +84,8 @@ class TodoistItem:
             updated_rows['content'] = self.content
         if self.priority != self._raw['priority']:
             updated_rows['priority'] = self.priority
-        if self.due != self._raw['due']:
-            updated_rows['due'] = self.due
+        if self._due != self._raw['due']:
+            updated_rows['due'] = self._due
         return self.todoist.update_item(self, **updated_rows)
 
     def __repr__(self):
