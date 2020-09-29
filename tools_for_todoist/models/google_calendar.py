@@ -27,7 +27,10 @@ from googleapiclient.discovery import build
 from tools_for_todoist.credentials import CREDENTIALS_JSON_PATH, TOKEN_CACHE_PATH
 from tools_for_todoist.models.event import CalendarEvent
 
-SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+SCOPES = [
+    'https://www.googleapis.com/auth/calendar.readonly',
+    'https://www.googleapis.com/auth/calendar.events'
+]
 
 
 def _save_credentials(token):
@@ -57,7 +60,7 @@ class GoogleCalendar:
         self._calendar_id = calendar_id
         self.api = build('calendar', 'v3', credentials=token)
         self._raw_events = []
-        self.events = {}
+        self._events = {}
         self.sync_token = None
         self.sync(True)
 
@@ -69,23 +72,27 @@ class GoogleCalendar:
             if recurring_event_id is not None:
                 pending_exceptions.append(event)
             elif event['status'] == 'cancelled':
-                self.events.pop(event['id'], None)
+                self._events.pop(event['id'], None)
                 cancelled_events.add(event['id'])
-            elif event['id'] not in self.events:
-                self.events[event['id']] = CalendarEvent.from_raw(event)
+            elif event['id'] not in self._events:
+                self._events[event['id']] = CalendarEvent.from_raw(self, event)
             else:
-                self.events[event['id']].update_from_raw(event)
+                self._events[event['id']].update_from_raw(event)
 
         for event in pending_exceptions:
             recurring_event_id = event.get('recurringEventId')
             if recurring_event_id in cancelled_events:
                 continue
-            if recurring_event_id not in self.events:
+            if recurring_event_id not in self._events:
                 print(
                     "Skipping recurring event exception because recurring event is missing: ",
                     recurring_event_id)
                 continue
-            self.events[recurring_event_id].update_exception(event)
+            self._events[recurring_event_id].update_exception(event)
+
+    def update_event(self, event_id, update_data):
+        self.api.events().patch(
+            calendarId=self._calendar_id, eventId=event_id, body=update_data).execute()
 
     def sync(self, initial_sync=False):
         sync_args = {
@@ -105,4 +112,5 @@ class GoogleCalendar:
             request = self.api.events().list_next(request, response)
         self.sync_token = response['nextSyncToken']
         self._process_sync()
+        return self._raw_events
 

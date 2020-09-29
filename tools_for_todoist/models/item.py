@@ -18,6 +18,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 from datetime import datetime
 
+
 class TodoistItem:
     def __init__(self, todoist, content, project_id):
         self.todoist = todoist
