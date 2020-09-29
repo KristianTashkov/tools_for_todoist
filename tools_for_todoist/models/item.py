@@ -66,6 +66,9 @@ class TodoistItem:
             'string': due_string
         }
 
+    def is_completed(self):
+        return self._raw['in_history']
+
     def set_next_occurrence(self, utc_date, include_time=True):
         self._due = {} if self._due is None else self._due.copy()
         next_date = datetime.strftime(utc_date, '%Y-%m-%d')
@@ -89,5 +92,6 @@ class TodoistItem:
         return self.todoist.update_item(self, **updated_rows)
 
     def __repr__(self):
-        return f'{self.id}: content:{self.content}, priority: {self.priority}, '\
+        completed_string = 'X' if self.is_completed() else 'O'
+        return f'{completed_string} {self.id}: content:{self.content}, priority: {self.priority}, '\
                f'due: {self.next_due_date()}, string: {self.get_due_string()}'

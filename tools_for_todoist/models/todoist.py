@@ -41,6 +41,8 @@ class Todoist:
             if item['project_id'] != self.active_project_id:
                 continue
             self._items[item['id']] = TodoistItem.from_raw(self, item)
+        for item in self.api.items.get_completed(self.active_project_id):
+            self._items[item['id']] = TodoistItem.from_raw(self, item)
 
     def _safety_filter_item(self, item):
         if item['type'] == 'item_add':
@@ -51,7 +53,7 @@ class Todoist:
 
     def _update_items(self, raw_updated_items):
         for item in raw_updated_items:
-            if item['in_history'] == 1 or item['is_deleted'] == 1:
+            if item['is_deleted'] == 1:
                 self._items.pop(item['id'], None)
             elif item['id'] not in self._items:
                 new_item = TodoistItem.from_raw(self, item)
@@ -75,12 +77,10 @@ class Todoist:
         filtered_items = []
         for item in self.api.queue:
             if not self._safety_filter_item(item):
-                print("Filtered:", item)
                 continue
             filtered_items.append(item)
         self.api.queue = filtered_items
         if len(self.api.queue) > 0:
-            print("Sending commands:", self.api.queue)
             result = self.api.commit()
         else:
             result = self.api.sync()
