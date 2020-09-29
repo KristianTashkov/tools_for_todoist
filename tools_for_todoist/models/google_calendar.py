@@ -59,28 +59,50 @@ class GoogleCalendar:
         self._raw_events = []
         self.events = {}
         self.sync_token = None
-        self._initial_sync()
+        self.sync(True)
 
-    def _initial_sync(self):
-        self.sync()
+    def _process_sync(self):
+        cancelled_events = set()
+        pending_exceptions = []
         for event in self._raw_events:
-            self.events[event['id']] = CalendarEvent.from_raw(event)
+            recurring_event_id = event.get('recurringEventId')
+            if recurring_event_id is not None:
+                pending_exceptions.append(event)
+            elif event['status'] == 'cancelled':
+                self.events.pop(event['id'], None)
+                cancelled_events.add(event['id'])
+            elif event['id'] not in self.events:
+                self.events[event['id']] = CalendarEvent.from_raw(event)
+            else:
+                self.events[event['id']].update_from_raw(event)
 
-    def sync(self):
-        request = self.api.events().list(
-            calendarId=self._calendar_id, syncToken=self.sync_token
-        )
+        for event in pending_exceptions:
+            recurring_event_id = event.get('recurringEventId')
+            if recurring_event_id in cancelled_events:
+                continue
+            if recurring_event_id not in self.events:
+                print(
+                    "Skipping recurring event exception because recurring event is missing: ",
+                    recurring_event_id)
+                continue
+            self.events[recurring_event_id].update_exception(event)
+
+    def sync(self, initial_sync=False):
+        sync_args = {
+            'calendarId': self._calendar_id,
+            'syncToken': self.sync_token,
+        }
+        if initial_sync:
+            import datetime
+            now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
+            sync_args['timeMin'] = now
+
+        request = self.api.events().list(**sync_args)
         self._raw_events = []
         while request is not None:
             response = request.execute()
             self._raw_events.extend(response['items'])
             request = self.api.events().list_next(request, response)
         self.sync_token = response['nextSyncToken']
+        self._process_sync()
 
-        for event in self._raw_events:
-            if event['status'] == 'cancelled':
-                self.events.pop(event['id'], None)
-            elif event['id'] not in self.events:
-                self.events[event['id']] = CalendarEvent.from_raw(event)
-            else:
-                self.events[event['id']].update_from_raw(event)
