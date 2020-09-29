@@ -60,6 +60,11 @@ class CalendarEvent:
             self._extended_properties = copy.deepcopy(self._extended_properties)
         self._extended_properties['private'][key] = value
 
+    def get_private_info(self, key):
+        if self._extended_properties is None:
+            return None
+        return self._extended_properties.get('private', {}).get(key)
+
     def save(self):
         updated_fields = {}
         if self.summary != self._raw.get('summary'):

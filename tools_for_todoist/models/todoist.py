@@ -47,8 +47,9 @@ class Todoist:
     def _safety_filter_item(self, item):
         if item['type'] == 'item_add':
             return item['args']['project_id'] == self.active_project_id
-        if item['type'] == 'item_update':
+        if item['type'] in ['item_update', 'item_delete']:
             return self._items[item['args']['id']].project_id == self.active_project_id
+        print("Filtered", item)
         return False
 
     def _update_items(self, raw_updated_items):
@@ -73,13 +74,11 @@ class Todoist:
     def update_item(self, item, **kwargs):
         self.api.items.update(item.id, **kwargs)
 
+    def delete_item(self, item):
+        self.api.items.delete(item.id)
+
     def sync(self):
-        filtered_items = []
-        for item in self.api.queue:
-            if not self._safety_filter_item(item):
-                continue
-            filtered_items.append(item)
-        self.api.queue = filtered_items
+        self.api.queue = [item for item in self.api.queue if self._safety_filter_item(item)]
         if len(self.api.queue) > 0:
             result = self.api.commit()
         else:

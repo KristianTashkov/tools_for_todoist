@@ -62,26 +62,32 @@ class GoogleCalendar:
         self._raw_events = []
         self._events = {}
         self.sync_token = None
-        self.sync(True)
 
     def _process_sync(self):
-        cancelled_events = set()
+        created_events = []
+        cancelled_events = []
+        cancelled_events_ids = set()
+
         pending_exceptions = []
         for event in self._raw_events:
             recurring_event_id = event.get('recurringEventId')
             if recurring_event_id is not None:
                 pending_exceptions.append(event)
             elif event['status'] == 'cancelled':
-                self._events.pop(event['id'], None)
-                cancelled_events.add(event['id'])
+                canceled_event = self._events.pop(event['id'], None)
+                if canceled_event is not None:
+                    cancelled_events.append(canceled_event)
+                cancelled_events_ids.add(event['id'])
             elif event['id'] not in self._events:
-                self._events[event['id']] = CalendarEvent.from_raw(self, event)
+                new_event = CalendarEvent.from_raw(self, event)
+                self._events[event['id']] = new_event
+                created_events.append(new_event)
             else:
                 self._events[event['id']].update_from_raw(event)
 
         for event in pending_exceptions:
             recurring_event_id = event.get('recurringEventId')
-            if recurring_event_id in cancelled_events:
+            if recurring_event_id in cancelled_events_ids:
                 continue
             if recurring_event_id not in self._events:
                 print(
@@ -90,27 +96,25 @@ class GoogleCalendar:
                 continue
             self._events[recurring_event_id].update_exception(event)
 
+        return {
+            'created': created_events,
+            'cancelled': cancelled_events
+        }
+
+    def get_event_by_id(self, event_id):
+        return self._events.get(event_id)
+
     def update_event(self, event_id, update_data):
         self.api.events().patch(
             calendarId=self._calendar_id, eventId=event_id, body=update_data).execute()
 
-    def sync(self, initial_sync=False):
-        sync_args = {
-            'calendarId': self._calendar_id,
-            'syncToken': self.sync_token,
-        }
-        if initial_sync:
-            import datetime
-            now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
-            sync_args['timeMin'] = now
-
-        request = self.api.events().list(**sync_args)
+    def sync(self):
+        request = self.api.events().list(calendarId=self._calendar_id, syncToken=self.sync_token)
         self._raw_events = []
         while request is not None:
             response = request.execute()
             self._raw_events.extend(response['items'])
             request = self.api.events().list_next(request, response)
         self.sync_token = response['nextSyncToken']
-        self._process_sync()
-        return self._raw_events
+        return self._process_sync()
 
