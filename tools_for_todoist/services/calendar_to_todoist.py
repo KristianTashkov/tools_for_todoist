@@ -16,6 +16,8 @@ more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
+import re
+
 from tools_for_todoist.models.google_calendar import GoogleCalendar
 from tools_for_todoist.models.item import TodoistItem
 from tools_for_todoist.models.todoist import Todoist
@@ -40,16 +42,20 @@ class CalendarToTodoistService:
                 continue
 
             todoist_id = calendar_event.get_private_info(CALENDAR_EVENT_TODOIST_KEY)
-            if todoist_id is not None and self.todoist.get_item_by_id(int(todoist_id)) is not None:
+            if (
+                    todoist_id is not None and
+                    re.fullmatch(r'[\d]*', todoist_id) is not None and
+                    self.todoist.get_item_by_id(int(todoist_id)) is not None
+            ):
                 continue
 
             item = TodoistItem(
                 self.todoist, calendar_event.summary, self.todoist.active_project_id)
             recurrence_string = calendar_event.get_recurrence_string()
-            if recurrence_string:
-                item.set_due_by_string(recurrence_string)
-            else:
-                item.set_next_due_date(calendar_event.get_start_datetime())
+            next_occurrence = calendar_event.get_next_occurrence().isoformat()
+            next_occurrence = re.search(
+                r'(.*T\d\d:\d\d:\d\d)\+(.*)', next_occurrence).groups()[0]
+            item.set_due(next_occurrence, recurrence_string)
             item.save()
             created_items.append((calendar_event, item))
 

@@ -57,18 +57,20 @@ class TodoistItem:
             format += 'Z'
         return datetime.strptime(self._due['date'], format)
 
-    def set_next_due_date(self, next_date):
-        self._due = {'date': next_date}
-
     def get_due_string(self):
         if self._due is None:
             return None
         return self._due['string']
 
-    def set_due_by_string(self, due_string):
-        self._due = {
-            'string': due_string
-        }
+    def set_due(self, next_date=None, due_string=None):
+        if next_date is None and due_string is None:
+            self._due = None
+            return
+        self._due = {}
+        if next_date is not None:
+            self._due['date'] = next_date
+        if due_string is not None:
+            self._due['string'] = due_string
 
     def is_completed(self):
         return self._raw['in_history']

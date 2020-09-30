@@ -91,7 +91,6 @@ class CalendarEvent:
             return self._raw['start']['date']
         return self._raw['start']['dateTime'].split('T')[0]
 
-
     def get_last_occurrence(self):
         start_date = datetime.fromisoformat(self.get_start_datetime()).astimezone(UTC)
         rrule = self._get_rrule()
@@ -100,6 +99,17 @@ class CalendarEvent:
 
         instances = rrulestr(rrule, dtstart=start_date)
         return instances[-1]
+
+    def get_next_occurrence(self):
+        start_date = datetime.fromisoformat(self.get_start_datetime()).astimezone(UTC)
+        rrule = self._get_rrule()
+        if rrule is None:
+            return start_date.astimezone()
+
+        instances = rrulestr(rrule, dtstart=start_date)
+        for event in instances:
+            if event > datetime.now(UTC):
+                return event.astimezone()
 
     def get_recurrence_string(self):
         rrule = self._get_rrule()
