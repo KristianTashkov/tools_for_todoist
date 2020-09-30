@@ -22,7 +22,8 @@ import re
 
 from recurrent import format
 from dateutil.rrule import rrulestr
-from datetime import date
+from datetime import datetime
+from dateutil.tz import UTC
 
 
 class CalendarEvent:
@@ -72,29 +73,39 @@ class CalendarEvent:
             return None
         return self._extended_properties.get('private', {}).get(key)
 
-    def get_start_time(self):
+    def get_start_datetime(self):
         if 'dateTime' in self._raw['start']:
             match = re.search(r'(.*T\d\d:\d\d:\d\d)\+(.*)', self._raw['start']['dateTime'])
             return match.groups()[0]
         else:
             return self._raw['start']['date']
 
+    def get_start_date(self):
+        if 'date' in self._raw['start']:
+            return self._raw['start']['date']
+        return self._raw['start']['dateTime'].split('T')[0]
+
+    def get_last_occurrence(self):
+        start_date = datetime.fromisoformat(self.get_start_datetime()).astimezone(UTC)
+        recurrence = self._raw.get('recurrence')
+        if recurrence is None:
+            return start_date
+
+        instances = rrulestr(recurrence[-1], dtstart=start_date)
+        return instances[-1]
+
     def get_recurrence_string(self):
         recurrence = self._raw.get('recurrence')
         if recurrence is None:
             return None
 
-        match = re.search(r'(.*)T(\d\d:\d\d)', self.get_start_time())
+        match = re.search(r'(.*)T(\d\d:\d\d)', self.get_start_datetime())
         if match:
-            start_date = match.groups()[0]
             start_time = f"at {match.groups()[1]}"
         else:
-            start_date = self.get_start_time()
             start_time = None
 
-        recurrence_rule = recurrence[-1]
-        instances = rrulestr(recurrence_rule, dtstart=date.fromisoformat(start_date))
-        formatted = format(recurrence_rule)
+        formatted = format(recurrence[-1])
         match = re.search(r'until (\d{4})(\d{2})(\d{2})T\d*Z', formatted)
         if match is not None:
             end_date = '-'.join(match.groups()[::-1])
@@ -110,7 +121,7 @@ class CalendarEvent:
         formatted = re.sub(r'week on ', '', formatted)
         match = re.search(r'for ([\d]*) times|twice', formatted)
         if match:
-            last_instance = str(instances[-1]).rpartition(' ')[0]
+            last_instance = str(self.get_last_occurrence()).rpartition(' ')[0]
             formatted = f'{formatted[:match.span()[0]]}' \
                         f'{start_time} until {last_instance}' \
                         f'{formatted[match.span()[1]:]}'

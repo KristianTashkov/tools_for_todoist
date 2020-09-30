@@ -19,6 +19,8 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 from tools_for_todoist.models.google_calendar import GoogleCalendar
 from tools_for_todoist.models.item import TodoistItem
 from tools_for_todoist.models.todoist import Todoist
+from datetime import datetime
+from dateutil.tz import UTC
 
 CALENDAR_EVENT_TODOIST_KEY = 'todoist_item_id'
 
@@ -33,6 +35,10 @@ class CalendarToTodoistService:
         created_items = []
 
         for calendar_event in sync_result['created']:
+            last_occurrence = calendar_event.get_last_occurrence()
+            if last_occurrence < datetime.now(UTC):
+                continue
+
             todoist_id = calendar_event.get_private_info(CALENDAR_EVENT_TODOIST_KEY)
             if todoist_id is not None and self.todoist.get_item_by_id(int(todoist_id)) is not None:
                 continue
@@ -43,7 +49,7 @@ class CalendarToTodoistService:
             if recurrence_string:
                 item.set_due_by_string(recurrence_string)
             else:
-                item.set_next_due_date(calendar_event.get_start_time())
+                item.set_next_due_date(calendar_event.get_start_datetime())
             item.save()
             created_items.append((calendar_event, item))
 
