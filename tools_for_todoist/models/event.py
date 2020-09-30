@@ -36,6 +36,12 @@ class CalendarEvent:
         self.summary = None
         self._extended_properties = None
 
+    def _get_rrule(self):
+        recurrence = self._raw.get('recurrence')
+        if recurrence is None:
+            return None
+        return [x for x in recurrence if 'RRULE' in x][0]
+
     @staticmethod
     def from_raw(google_calendar, raw):
         event = CalendarEvent(google_calendar)
@@ -85,18 +91,19 @@ class CalendarEvent:
             return self._raw['start']['date']
         return self._raw['start']['dateTime'].split('T')[0]
 
+
     def get_last_occurrence(self):
         start_date = datetime.fromisoformat(self.get_start_datetime()).astimezone(UTC)
-        recurrence = self._raw.get('recurrence')
-        if recurrence is None:
+        rrule = self._get_rrule()
+        if rrule is None:
             return start_date
 
-        instances = rrulestr(recurrence[-1], dtstart=start_date)
+        instances = rrulestr(rrule, dtstart=start_date)
         return instances[-1]
 
     def get_recurrence_string(self):
-        recurrence = self._raw.get('recurrence')
-        if recurrence is None:
+        rrule = self._get_rrule()
+        if rrule is None:
             return None
 
         match = re.search(r'(.*)T(\d\d:\d\d)', self.get_start_datetime())
@@ -105,7 +112,7 @@ class CalendarEvent:
         else:
             start_time = None
 
-        formatted = format(recurrence[-1])
+        formatted = format(rrule)
         match = re.search(r'until (\d{4})(\d{2})(\d{2})T\d*Z', formatted)
         if match is not None:
             end_date = '-'.join(match.groups()[::-1])
