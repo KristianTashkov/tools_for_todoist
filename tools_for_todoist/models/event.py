@@ -17,8 +17,12 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 import copy
-from recurrent import format
 import re
+
+
+from recurrent import format
+from dateutil.rrule import rrulestr
+from datetime import date
 
 
 class CalendarEvent:
@@ -80,13 +84,17 @@ class CalendarEvent:
         if recurrence is None:
             return None
 
-        match = re.search(r'.*T(\d\d:\d\d)', self.get_start_time())
+        match = re.search(r'(.*)T(\d\d:\d\d)', self.get_start_time())
         if match:
-            start_time = f"at {match.groups()[0]}"
+            start_date = match.groups()[0]
+            start_time = f"at {match.groups()[1]}"
         else:
+            start_date = self.get_start_time()
             start_time = None
 
-        formatted = format(recurrence[-1])
+        recurrence_rule = recurrence[-1]
+        instances = rrulestr(recurrence_rule, dtstart=date.fromisoformat(start_date))
+        formatted = format(recurrence_rule)
         match = re.search(r'until (\d{4})(\d{2})(\d{2})T\d*Z', formatted)
         if match is not None:
             end_date = '-'.join(match.groups()[::-1])
@@ -100,7 +108,13 @@ class CalendarEvent:
                         f'every {match.groups()[0]}'\
                         f'{formatted[match.span()[1]:]}'
         formatted = re.sub(r'week on ', '', formatted)
-        formatted = re.sub(r'for [\d]* times', '', formatted)
+        match = re.search(r'for ([\d]*) times|twice', formatted)
+        if match:
+            last_instance = str(instances[-1]).rpartition(' ')[0]
+            formatted = f'{formatted[:match.span()[0]]}' \
+                        f'{start_time} until {last_instance}' \
+                        f'{formatted[match.span()[1]:]}'
+            start_time = None
         if start_time is not None:
             formatted += f' {start_time}'
         return formatted
