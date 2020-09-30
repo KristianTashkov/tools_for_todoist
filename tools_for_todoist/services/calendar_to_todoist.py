@@ -57,6 +57,6 @@ class CalendarToTodoistService:
         self.todoist.sync()
         for calendar_event, todoist_item in created_items:
             calendar_event.save_private_info(CALENDAR_EVENT_TODOIST_KEY, todoist_item.id)
-            #calendar_event.save()
+            calendar_event.save()
 
         return sync_result

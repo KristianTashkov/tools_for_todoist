@@ -22,7 +22,7 @@ from datetime import datetime
 class TodoistItem:
     def __init__(self, todoist, content, project_id):
         self.todoist = todoist
-        self.content = content
+        self.content = content or '(No title)'
         self.project_id = project_id
 
         self.id = -1
