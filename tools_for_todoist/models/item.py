@@ -44,6 +44,9 @@ class TodoistItem:
         self._due = raw['due']
         self.project_id = raw['project_id']
 
+    def is_recurring(self):
+        return self._due is not None and self._due['is_recurring']
+
     def next_due_date(self):
         if self._due is None:
             return None
@@ -54,8 +57,8 @@ class TodoistItem:
             format += 'Z'
         return datetime.strptime(self._due['date'], format)
 
-    def is_recurring(self):
-        return self._due is not None and self._due['is_recurring']
+    def set_next_due_date(self, next_date):
+        self._due = {'date': next_date}
 
     def get_due_string(self):
         if self._due is None:
@@ -69,13 +72,6 @@ class TodoistItem:
 
     def is_completed(self):
         return self._raw['in_history']
-
-    def set_next_occurrence(self, utc_date, include_time=True):
-        self._due = {} if self._due is None else self._due.copy()
-        next_date = datetime.strftime(utc_date, '%Y-%m-%d')
-        if include_time:
-            next_date += 'T' + datetime.strftime(utc_date, '%H:%M:%S')
-        self._due['date'] = next_date
 
     def save(self):
         if self.id == -1:

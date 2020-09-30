@@ -39,6 +39,11 @@ class CalendarToTodoistService:
 
             item = TodoistItem(
                 self.todoist, calendar_event.summary, self.todoist.active_project_id)
+            recurrence_string = calendar_event.get_recurrence_string()
+            if recurrence_string:
+                item.set_due_by_string(recurrence_string)
+            else:
+                item.set_next_due_date(calendar_event.get_start_time())
             item.save()
             created_items.append((calendar_event, item))
 
@@ -52,6 +57,6 @@ class CalendarToTodoistService:
         self.todoist.sync()
         for calendar_event, todoist_item in created_items:
             calendar_event.save_private_info(CALENDAR_EVENT_TODOIST_KEY, todoist_item.id)
-            calendar_event.save()
+            #calendar_event.save()
 
         return sync_result

@@ -67,7 +67,7 @@ class Todoist:
 
     def add_item(self, item):
         item_raw = self.api.items.add(
-            item.content, project_id=item.project_id, priority=item.priority)
+            item.content, project_id=item.project_id, priority=item.priority, due=item._due)
         self._items[item_raw['id']] = item
         return item_raw
 

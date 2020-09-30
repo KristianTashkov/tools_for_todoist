@@ -20,6 +20,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import os
 import pickle
+import datetime
 
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -109,7 +110,13 @@ class GoogleCalendar:
             calendarId=self._calendar_id, eventId=event_id, body=update_data).execute()
 
     def sync(self):
-        request = self.api.events().list(calendarId=self._calendar_id, syncToken=self.sync_token)
+        extra_params = {}
+        if self.sync_token is None:
+            now = datetime.datetime.utcnow().isoformat() + 'Z'
+            extra_params['timeMin'] = now
+        request = self.api.events().list(
+            calendarId=self._calendar_id, syncToken=self.sync_token, **extra_params)
+
         self._raw_events = []
         while request is not None:
             response = request.execute()
