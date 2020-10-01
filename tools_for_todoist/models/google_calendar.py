@@ -19,10 +19,11 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
 import os
-import pickle
+import json
 import datetime
 
 from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from tools_for_todoist.credentials import CREDENTIALS_JSON_PATH, TOKEN_CACHE_PATH
@@ -35,14 +36,14 @@ SCOPES = [
 
 
 def _save_credentials(token):
-    with open(TOKEN_CACHE_PATH, 'wb') as token_io:
-        pickle.dump(token, token_io)
-    
+    with open(TOKEN_CACHE_PATH, 'w') as token_io:
+        token_io.write(token.to_json())
+
 
 def _do_auth():
     if os.path.exists(TOKEN_CACHE_PATH):
         with open(TOKEN_CACHE_PATH, 'rb') as token_io:
-            token = pickle.load(token_io)
+            token = Credentials.from_authorized_user_info(json.loads(token_io.readline().strip()))
         if token.valid:
             return token
         if token.expired and token.refresh_token:

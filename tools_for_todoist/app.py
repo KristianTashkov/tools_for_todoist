@@ -19,7 +19,9 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 import time
 import os
 
-from tools_for_todoist.credentials import CREDENTIALS_JSON_PATH, TODOIST_API_TOKEN_PATH
+from tools_for_todoist.credentials import (
+    CREDENTIALS_JSON_PATH, TODOIST_API_TOKEN_PATH, TOKEN_CACHE_PATH
+)
 from tools_for_todoist.services.calendar_to_todoist import CalendarToTodoistService
 
 if not os.path.exists(CREDENTIALS_JSON_PATH):
@@ -29,6 +31,10 @@ if not os.path.exists(CREDENTIALS_JSON_PATH):
 if not os.path.exists(TODOIST_API_TOKEN_PATH):
     with open(TODOIST_API_TOKEN_PATH, 'w') as file:
         file.write(os.environ.get('TODOIST_API_KEY'))
+
+if not os.path.exists(TOKEN_CACHE_PATH):
+    with open(TOKEN_CACHE_PATH, 'w') as file:
+        file.write(os.environ.get('GOOGLE_CALENDAR_TOKEN'))
 
 todoist_project = os.environ.get('TODOIST_PROJECT_NAME')
 calendar_id = os.environ.get('GOOGLE_CALENDAR_ID')
