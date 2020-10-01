@@ -98,11 +98,11 @@ class CalendarEvent:
         start_date = datetime.fromisoformat(self.get_start_datetime()).astimezone(UTC)
         rrule = self._get_rrule()
         if rrule is None:
-            return start_date
+            return start_date.astimezone(UTC)
 
         instances = rrulestr(rrule, dtstart=start_date)
         if instances.count() > 0:
-            return instances[-1]
+            return instances[-1].astimezone(UTC)
         return None
 
     def get_next_occurrence(self):
