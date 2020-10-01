@@ -1,1 +1,1 @@
-web: python tools_for_todoist/app.py
+worker: python tools_for_todoist/app.py
