@@ -50,7 +50,8 @@ def _do_auth():
             _save_credentials(token)
             return token
     flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_JSON_PATH, SCOPES)
-    token = flow.run_local_server(port=0)
+    host = os.environ.get('HOST') or 'localhost'
+    token = flow.run_local_server(host=host, port=0)
     _save_credentials(token)
     return token
 
