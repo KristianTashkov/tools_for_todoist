@@ -36,6 +36,9 @@ class CalendarEvent:
         self.summary = None
         self._extended_properties = None
 
+    def id(self):
+        return self._id
+
     def _get_rrule(self):
         recurrence = self._raw.get('recurrence')
         if recurrence is None:

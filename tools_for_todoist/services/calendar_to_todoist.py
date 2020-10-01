@@ -25,6 +25,7 @@ from datetime import datetime
 from dateutil.tz import UTC
 
 CALENDAR_EVENT_TODOIST_KEY = 'todoist_item_id'
+CALENDAR_EVENT_ID = 'calendar_event_id'
 
 
 class CalendarToTodoistService:
@@ -39,13 +40,24 @@ class CalendarToTodoistService:
         for calendar_event in sync_result['created']:
             last_occurrence = calendar_event.get_last_occurrence()
             if last_occurrence is None or last_occurrence < datetime.now(UTC):
+                todoist_id = calendar_event.get_private_info(CALENDAR_EVENT_TODOIST_KEY)
+                if todoist_id is None:
+                    continue
+
+                todoist_item = self.todoist.get_item_by_id(int(todoist_id))
+                if todoist_item is None:
+                    continue
+
+                self.todoist.delete_item(todoist_item)
                 continue
 
             todoist_id = calendar_event.get_private_info(CALENDAR_EVENT_TODOIST_KEY)
+            calendar_id = calendar_event.get_private_info(CALENDAR_EVENT_ID)
             if (
                     todoist_id is not None and
                     re.fullmatch(r'[\d]*', todoist_id) is not None and
-                    self.todoist.get_item_by_id(int(todoist_id)) is not None
+                    self.todoist.get_item_by_id(int(todoist_id)) is not None and
+                    calendar_id == calendar_event.id()
             ):
                 continue
 
@@ -69,6 +81,7 @@ class CalendarToTodoistService:
         self.todoist.sync()
         for calendar_event, todoist_item in created_items:
             calendar_event.save_private_info(CALENDAR_EVENT_TODOIST_KEY, todoist_item.id)
+            calendar_event.save_private_info(CALENDAR_EVENT_ID, calendar_event.id())
             calendar_event.save()
 
         return sync_result

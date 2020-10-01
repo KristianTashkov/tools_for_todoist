@@ -112,9 +112,6 @@ class GoogleCalendar:
 
     def sync(self):
         extra_params = {}
-        if self.sync_token is None:
-            now = datetime.datetime.utcnow().isoformat() + 'Z'
-            extra_params['timeMin'] = now
         request = self.api.events().list(
             calendarId=self._calendar_id, syncToken=self.sync_token, **extra_params)
 
