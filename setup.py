@@ -39,5 +39,6 @@ setuptools.setup(
         'google-auth-httplib2==0.0.4',
         'google-auth-oauthlib==0.4.1',
         'recurrent==0.4.0',
+        'python-dateutil==2.8.1'
     ],
 )
