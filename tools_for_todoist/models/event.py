@@ -98,7 +98,9 @@ class CalendarEvent:
             return start_date
 
         instances = rrulestr(rrule, dtstart=start_date)
-        return instances[-1]
+        if instances.count() > 0:
+            return instances[-1]
+        return None
 
     def get_next_occurrence(self):
         start_date = datetime.fromisoformat(self.get_start_datetime()).astimezone(UTC)

@@ -38,7 +38,7 @@ class CalendarToTodoistService:
 
         for calendar_event in sync_result['created']:
             last_occurrence = calendar_event.get_last_occurrence()
-            if last_occurrence < datetime.now(UTC):
+            if last_occurrence is None or last_occurrence < datetime.now(UTC):
                 continue
 
             todoist_id = calendar_event.get_private_info(CALENDAR_EVENT_TODOIST_KEY)
