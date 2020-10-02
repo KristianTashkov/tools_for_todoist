@@ -68,9 +68,10 @@ class GoogleCalendar:
     def _process_sync(self):
         created_events = []
         cancelled_events = []
+        updated_events = []
+        pending_exceptions = []
         cancelled_events_ids = set()
 
-        pending_exceptions = []
         for event in self._raw_events:
             recurring_event_id = event.get('recurringEventId')
             if recurring_event_id is not None:
@@ -86,6 +87,7 @@ class GoogleCalendar:
                 created_events.append(new_event)
             else:
                 self._events[event['id']].update_from_raw(event)
+                updated_events.append(event)
 
         for event in pending_exceptions:
             recurring_event_id = event.get('recurringEventId')
@@ -93,14 +95,15 @@ class GoogleCalendar:
                 continue
             if recurring_event_id not in self._events:
                 print(
-                    "Skipping recurring event exception because recurring event is missing: ",
-                    recurring_event_id)
+                    "Skipping recurring event exception for missing event: ", event)
                 continue
             self._events[recurring_event_id].update_exception(event)
 
         return {
             'created': created_events,
-            'cancelled': cancelled_events
+            'cancelled': cancelled_events,
+            'updated': updated_events,
+            'exceptions': pending_exceptions
         }
 
     def get_event_by_id(self, event_id):
@@ -121,5 +124,7 @@ class GoogleCalendar:
             self._raw_events.extend(response['items'])
             request = self.api.events().list_next(request, response)
         self.sync_token = response['nextSyncToken']
-        return self._process_sync()
+        sync_result = self._process_sync()
+        sync_result['raw_events'] = self._raw_events
+        return sync_result
 

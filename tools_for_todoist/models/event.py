@@ -39,6 +39,9 @@ class CalendarEvent:
     def id(self):
         return self._id
 
+    def raw(self):
+        return self._raw
+
     def _get_rrule(self):
         recurrence = self._raw.get('recurrence')
         if recurrence is None:
@@ -164,5 +167,4 @@ class CalendarEvent:
     def __repr__(self):
         if self._raw['status'] == 'cancelled':
             return f"{self._id}: {self._raw['originalStartTime']} cancelled"
-        return f"{self._id}: {self.summary}, {self._raw['start']} - {self._raw['end']} "\
-               f"exceptions: {self.exceptions}"
+        return f"{self._id}: {self.summary}, {self.get_start_datetime()}, {self._get_rrule()}"

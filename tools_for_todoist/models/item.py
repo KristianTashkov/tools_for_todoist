@@ -30,6 +30,9 @@ class TodoistItem:
         self._due = None
         self._raw = None
 
+    def raw(self):
+        return self._raw
+
     @staticmethod
     def from_raw(todoist, raw):
         item = TodoistItem(todoist, raw['content'], raw['project_id'])
@@ -48,7 +51,7 @@ class TodoistItem:
         return self._due is not None and self._due['is_recurring']
 
     def next_due_date(self):
-        if self._due is None:
+        if self._due is None or 'date' not in self._due:
             return None
         format = '%Y-%m-%d'
         if 'T' in self._due['date']:
@@ -60,7 +63,7 @@ class TodoistItem:
     def get_due_string(self):
         if self._due is None:
             return None
-        return self._due['string']
+        return self._due.get('string', None)
 
     def set_due(self, next_date=None, due_string=None):
         if next_date is None and due_string is None:
@@ -73,7 +76,9 @@ class TodoistItem:
             self._due['string'] = due_string
 
     def is_completed(self):
-        return self._raw['in_history']
+        if self.id == -1:
+            return False
+        return self._raw.get('in_history', False)
 
     def save(self):
         if self.id == -1:
@@ -92,5 +97,5 @@ class TodoistItem:
 
     def __repr__(self):
         completed_string = 'X' if self.is_completed() else 'O'
-        return f'{completed_string} {self.id}: content:{self.content}, priority: {self.priority}, '\
+        return f'{completed_string} {self.id}: content:{self.content}, '\
                f'due: {self.next_due_date()}, string: {self.get_due_string()}'

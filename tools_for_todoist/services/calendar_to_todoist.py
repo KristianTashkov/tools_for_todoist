@@ -38,6 +38,7 @@ class CalendarToTodoistService:
         created_items = []
 
         for calendar_event in sync_result['created']:
+            print('Processing new event|', calendar_event)
             last_occurrence = calendar_event.get_last_occurrence()
             if last_occurrence is None or last_occurrence < datetime.now(UTC):
                 todoist_id = calendar_event.get_private_info(CALENDAR_EVENT_TODOIST_KEY)
@@ -72,6 +73,7 @@ class CalendarToTodoistService:
             created_items.append((calendar_event, item))
 
         for calendar_event in sync_result['cancelled']:
+            print('Canceling event|', calendar_event)
             todoist_id = calendar_event.get_private_info(CALENDAR_EVENT_TODOIST_KEY)
             if todoist_id is not None:
                 todoist_item = self.todoist.get_item_by_id(int(todoist_id))

@@ -49,7 +49,6 @@ class Todoist:
             return item['args']['project_id'] == self.active_project_id
         if item['type'] in ['item_update', 'item_delete']:
             return self._items[item['args']['id']].project_id == self.active_project_id
-        print("Filtered", item)
         return False
 
     def _update_items(self, raw_updated_items):
@@ -66,15 +65,18 @@ class Todoist:
         return self._items.get(id)
 
     def add_item(self, item):
+        print('Adding item|', item)
         item_raw = self.api.items.add(
             item.content, project_id=item.project_id, priority=item.priority, due=item._due)
         self._items[item_raw['id']] = item
         return item_raw
 
     def update_item(self, item, **kwargs):
+        print('Updating item|', item)
         self.api.items.update(item.id, **kwargs)
 
     def delete_item(self, item):
+        print('Deleting item|', item)
         self.api.items.delete(item.id)
 
     def sync(self):
