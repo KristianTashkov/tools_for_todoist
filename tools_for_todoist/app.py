@@ -43,10 +43,9 @@ sync_service = CalendarToTodoistService(calendar_id, todoist_project)
 while True:
     result = sync_service.step()
     if result['updated'] or result['exceptions']:
-        print('--Non Processed--')
         for event in result['updated']:
-            print('Updated|', event)
+            print('RAW|Updated|', event)
         for event in result['exceptions']:
-            print('Exception|', event)
+            print('RAW|Event Instance|', event)
 
     time.sleep(10)

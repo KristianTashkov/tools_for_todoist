@@ -20,7 +20,6 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import os
 import json
-import datetime
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
