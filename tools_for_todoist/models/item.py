@@ -16,7 +16,10 @@ more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
-from datetime import datetime
+from dateutil.tz import gettz
+from dateutil.parser import parse
+
+from tools_for_todoist.utils import to_todoist_date
 
 
 class TodoistItem:
@@ -53,12 +56,12 @@ class TodoistItem:
     def next_due_date(self):
         if self._due is None or 'date' not in self._due:
             return None
-        format = '%Y-%m-%d'
-        if 'T' in self._due['date']:
-            format += 'T%H:%M:%S'
-        if 'Z' in self._due['date']:
-            format += 'Z'
-        return datetime.strptime(self._due['date'], format)
+        dt = parse(self._due['date'])
+        if 'T' not in self._due['date']:
+            return dt.date()
+        if self._due.get('timezone'):
+            dt = dt.astimezone(gettz(self._due['timezone']))
+        return dt
 
     def get_due_string(self):
         if self._due is None:
@@ -71,7 +74,7 @@ class TodoistItem:
             return
         self._due = {}
         if next_date is not None:
-            self._due['date'] = next_date
+            self._due['date'], self._due['timezone'] = to_todoist_date(next_date)
         if due_string is not None:
             self._due['string'] = due_string
 

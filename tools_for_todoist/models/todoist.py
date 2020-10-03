@@ -85,14 +85,18 @@ class Todoist:
             result = self.api.commit()
         else:
             result = self.api.sync()
-        for temporary_key in result['temp_id_mapping']:
-            item = self._items.pop(temporary_key)
-            item.id = result['temp_id_mapping'][temporary_key]
-            self._items[item.id] = item
-        active_project_item_updates = [
-            x for x in result['items']
-            if x['project_id'] == self.active_project_id or x['project_id'] == 0
-        ]
-        self._update_items(active_project_item_updates)
+        try:
+            for temporary_key, new_id in result.get('temp_id_mapping', {}).items():
+                item = self._items.pop(temporary_key)
+                item.id = new_id
+                self._items[new_id] = item
+            active_project_item_updates = [
+                x for x in result['items']
+                if x['project_id'] == self.active_project_id or x['project_id'] == 0
+            ]
+            self._update_items(active_project_item_updates)
+        except:
+            print('Todoist Sync Failed|', result)
+            raise
         return result
 

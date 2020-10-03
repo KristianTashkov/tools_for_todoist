@@ -39,9 +39,12 @@ class CalendarToTodoistService:
 
         for calendar_event in sync_result['created']:
             print('Processing new event|', calendar_event)
-            last_occurrence = calendar_event.get_last_occurrence()
-            if last_occurrence is None or last_occurrence < datetime.now(UTC):
-                todoist_id = calendar_event.get_private_info(CALENDAR_EVENT_TODOIST_KEY)
+            todoist_id = calendar_event.get_private_info(CALENDAR_EVENT_TODOIST_KEY)
+            if todoist_id is None or not re.fullmatch(r'[\d]*', todoist_id):
+                todoist_id = None
+
+            next_occurence = calendar_event.next_occurrence()
+            if next_occurence is None:
                 if todoist_id is None:
                     continue
 
@@ -52,11 +55,9 @@ class CalendarToTodoistService:
                 self.todoist.delete_item(todoist_item)
                 continue
 
-            todoist_id = calendar_event.get_private_info(CALENDAR_EVENT_TODOIST_KEY)
             calendar_id = calendar_event.get_private_info(CALENDAR_EVENT_ID)
             if (
                     todoist_id is not None and
-                    re.fullmatch(r'[\d]*', todoist_id) is not None and
                     self.todoist.get_item_by_id(int(todoist_id)) is not None and
                     calendar_id == calendar_event.id()
             ):
@@ -64,17 +65,18 @@ class CalendarToTodoistService:
 
             item = TodoistItem(
                 self.todoist, calendar_event.summary, self.todoist.active_project_id)
-            recurrence_string = calendar_event.get_recurrence_string()
-            next_occurrence = calendar_event.get_next_occurrence().isoformat()
-            next_occurrence = re.search(
-                r'(.*T\d\d:\d\d:\d\d)\+(.*)', next_occurrence).groups()[0]
-            item.set_due(next_occurrence, recurrence_string)
+            item.set_due(
+                next_occurence,
+                calendar_event.recurrence_string())
             item.save()
             created_items.append((calendar_event, item))
 
         for calendar_event in sync_result['cancelled']:
             print('Canceling event|', calendar_event)
             todoist_id = calendar_event.get_private_info(CALENDAR_EVENT_TODOIST_KEY)
+            if todoist_id is None or not re.fullmatch(r'[\d]*', todoist_id):
+                todoist_id = None
+
             if todoist_id is not None:
                 todoist_item = self.todoist.get_item_by_id(int(todoist_id))
                 if todoist_item is not None:

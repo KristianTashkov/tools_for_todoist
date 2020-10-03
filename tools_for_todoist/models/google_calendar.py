@@ -63,6 +63,8 @@ class GoogleCalendar:
         self._raw_events = []
         self._events = {}
         self.sync_token = None
+        self.default_timezone = self.api.calendars().get(
+            calendarId=self._calendar_id).execute()['timeZone']
 
     def _process_sync(self):
         created_events = []

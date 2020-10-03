@@ -22,8 +22,11 @@ import re
 
 from recurrent import format
 from dateutil.rrule import rrulestr
+from dateutil.parser import parse
 from datetime import datetime
-from dateutil.tz import UTC
+from dateutil.tz import UTC, gettz
+
+from tools_for_todoist.utils import ensure_datetime
 
 
 class CalendarEvent:
@@ -42,11 +45,19 @@ class CalendarEvent:
     def raw(self):
         return self._raw
 
-    def _get_rrule(self):
+    def _get_recurrence(self):
         recurrence = self._raw.get('recurrence')
         if recurrence is None:
             return None
-        return [x for x in recurrence if 'RRULE' in x][0]
+        return '\n'.join(recurrence)
+
+    def _get_rrule(self):
+        rrule = self._get_recurrence()
+        if rrule is None:
+            return None
+
+        start_date = ensure_datetime(self._get_start())
+        return rrulestr(rrule, dtstart=start_date.astimezone(UTC), unfold=True)
 
     @staticmethod
     def from_raw(google_calendar, raw):
@@ -85,46 +96,41 @@ class CalendarEvent:
             return None
         return self._extended_properties.get('private', {}).get(key)
 
-    def get_start_datetime(self):
-        if 'dateTime' in self._raw['start']:
-            match = re.search(r'(.*T\d\d:\d\d:\d\d)\+(.*)', self._raw['start']['dateTime'])
-            return match.groups()[0]
-        else:
-            return self._raw['start']['date']
+    def _get_start(self):
+        raw_start = self._raw['start']
+        if 'date' in raw_start:
+            return parse(raw_start['date']).date()
+        dt = parse(raw_start['dateTime'])
+        time_zone = raw_start.get('timeZone', self.google_calendar.default_timezone)
+        return dt.astimezone(gettz(time_zone))
 
-    def get_start_date(self):
-        if 'date' in self._raw['start']:
-            return self._raw['start']['date']
-        return self._raw['start']['dateTime'].split('T')[0]
+    def _last_occurrence(self):
+        instances = self._get_rrule()
+        if instances is None:
+            return self._get_start()
 
-    def get_last_occurrence(self):
-        start_date = datetime.fromisoformat(self.get_start_datetime()).astimezone(UTC)
-        rrule = self._get_rrule()
-        if rrule is None:
-            return start_date.astimezone(UTC)
-
-        instances = rrulestr(rrule, dtstart=start_date)
         if instances.count() > 0:
-            return instances[-1].astimezone(UTC)
+            return instances[-1]
         return None
 
-    def get_next_occurrence(self):
-        start_date = datetime.fromisoformat(self.get_start_datetime()).astimezone(UTC)
-        rrule = self._get_rrule()
-        if rrule is None:
-            return start_date.astimezone()
+    def next_occurrence(self):
+        instances = self._get_rrule()
+        start = self._get_start()
+        if instances is None:
+            return start if datetime.now(UTC) < ensure_datetime(start).astimezone(UTC) else None
 
-        instances = rrulestr(rrule, dtstart=start_date)
-        for event in instances:
-            if event > datetime.now(UTC):
-                return event.astimezone()
+        next_occurence = instances.after(datetime.now(UTC), inc=True)
+        if next_occurence is not None:
+            return next_occurence.astimezone(start.tzinfo)
+        return None
 
-    def get_recurrence_string(self):
-        rrule = self._get_rrule()
+    def recurrence_string(self):
+        rrule = self._get_recurrence()
         if rrule is None:
             return None
+        rrule = [x for x in rrule.split('\n') if 'RRULE' in x][0]
 
-        match = re.search(r'(.*)T(\d\d:\d\d)', self.get_start_datetime())
+        match = re.search(r'(.*)T(\d\d:\d\d).*', self._get_start().isoformat())
         if match:
             start_time = f"at {match.groups()[1]}"
         else:
@@ -146,7 +152,7 @@ class CalendarEvent:
         formatted = re.sub(r'week on ', '', formatted)
         match = re.search(r'for ([\d]*) times|twice', formatted)
         if match:
-            last_instance = str(self.get_last_occurrence()).rpartition(' ')[0]
+            last_instance = str(self._last_occurrence()).rpartition(' ')[0]
             formatted = f'{formatted[:match.span()[0]]}' \
                         f'{start_time} until {last_instance}' \
                         f'{formatted[match.span()[1]:]}'
@@ -167,4 +173,4 @@ class CalendarEvent:
     def __repr__(self):
         if self._raw['status'] == 'cancelled':
             return f"{self._id}: {self._raw['originalStartTime']} cancelled"
-        return f"{self._id}: {self.summary}, {self.get_start_datetime()}, {self._get_rrule()}"
+        return f"{self._id}: {self.summary}, {self._get_start()}, {self._get_rrule()}"
