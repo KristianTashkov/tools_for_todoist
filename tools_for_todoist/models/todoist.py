@@ -52,14 +52,28 @@ class Todoist:
         return False
 
     def _update_items(self, raw_updated_items):
+        deleted_items = []
+        new_items = []
+        updated_items = []
         for item in raw_updated_items:
             if item['is_deleted'] == 1:
-                self._items.pop(item['id'], None)
+                old_item = self._items.pop(item['id'], None)
+                if old_item is not None:
+                    deleted_items.append(old_item)
             elif item['id'] not in self._items:
                 new_item = TodoistItem.from_raw(self, item)
                 self._items[new_item.id] = new_item
+                new_items.append(new_item)
             else:
-                self.get_item_by_id(item['id']).update_from_raw(item)
+                old_item = TodoistItem.from_raw(self, self._items[item['id']].raw())
+                item_model = self.get_item_by_id(item['id'])
+                item_model.update_from_raw(item)
+                updated_items.append((old_item, item_model))
+        return {
+            'deleted': deleted_items,
+            'created': new_items,
+            'updated': updated_items,
+        }
 
     def get_item_by_id(self, id):
         return self._items.get(id)
@@ -69,7 +83,7 @@ class Todoist:
         item_raw = self.api.items.add(
             item.content, project_id=item.project_id, priority=item.priority, due=item._due)
         self._items[item_raw['id']] = item
-        return item_raw
+        return item_raw.data
 
     def update_item(self, item, **kwargs):
         print('Updating item|', item)
@@ -94,9 +108,10 @@ class Todoist:
                 x for x in result['items']
                 if x['project_id'] == self.active_project_id or x['project_id'] == 0
             ]
-            self._update_items(active_project_item_updates)
+            sync_result = self._update_items(active_project_item_updates)
         except:
             print('Todoist Sync Failed|', result)
             raise
-        return result
+        sync_result['raw'] = result
+        return sync_result
 

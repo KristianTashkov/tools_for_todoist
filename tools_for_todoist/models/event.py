@@ -23,7 +23,7 @@ import re
 from recurrent import format
 from dateutil.rrule import rrulestr
 from dateutil.parser import parse
-from datetime import datetime, timedelta
+from datetime import datetime
 from dateutil.tz import UTC, gettz
 
 from tools_for_todoist.utils import ensure_datetime, is_allday

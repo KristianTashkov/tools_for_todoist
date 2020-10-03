@@ -41,11 +41,12 @@ calendar_id = os.environ.get('GOOGLE_CALENDAR_ID')
 sync_service = CalendarToTodoistService(calendar_id, todoist_project)
 
 while True:
-    result = sync_service.step()
-    if result['updated'] or result['exceptions']:
-        for event in result['updated']:
+    result = sync_service.sync()
+    google_sync_result = result['google_calendar']
+    if google_sync_result['updated'] or google_sync_result['exceptions']:
+        for event in google_sync_result['updated']:
             print('RAW|Updated|', event)
-        for event in result['exceptions']:
+        for event in google_sync_result['exceptions']:
             print('RAW|Event Instance|', event)
 
     time.sleep(10)

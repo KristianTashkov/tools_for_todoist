@@ -16,6 +16,8 @@ more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
+import copy
+
 from dateutil.tz import gettz
 from dateutil.parser import parse
 
@@ -44,11 +46,11 @@ class TodoistItem:
         return item
 
     def update_from_raw(self, raw):
-        self._raw = raw
-        self.content = raw['content']
-        self.priority = raw['priority']
-        self._due = raw['due']
-        self.project_id = raw['project_id']
+        self._raw = copy.deepcopy(raw)
+        self.content = self._raw['content']
+        self.priority = self._raw['priority']
+        self._due = self._raw['due']
+        self.project_id = self._raw['project_id']
 
     def is_recurring(self):
         return self._due is not None and self._due['is_recurring']
@@ -101,4 +103,4 @@ class TodoistItem:
     def __repr__(self):
         completed_string = 'X' if self.is_completed() else 'O'
         return f'{completed_string} {self.id}: content:{self.content}, '\
-               f'due: {to_todoist_date(self.next_due_date())}, string: {self.get_due_string()}'
+               f'due: {self.next_due_date()}, string: {self.get_due_string()}'
