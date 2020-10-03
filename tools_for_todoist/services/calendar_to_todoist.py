@@ -37,10 +37,10 @@ def _todoist_id(calendar_event):
 
 
 def _has_item_completed(old_item, new_item):
-    if not old_item.next_due_date() and new_item.is_completed():
+    if not old_item.is_completed() and new_item.is_completed():
         return True
-    old_due =  old_item.next_due_date()
-    new_due =  new_item.next_due_date()
+    old_due = old_item.next_due_date()
+    new_due = new_item.next_due_date()
     if old_due is None or new_due is None:
         return False
     return ensure_datetime(old_due) < ensure_datetime(new_due)
