@@ -132,7 +132,7 @@ class CalendarEvent:
 
         start = self._get_start()
         if not is_allday(start):
-            start_time = f"at {start.time().hour}:{start.time().minute}"
+            start_time = f"at {start.time().hour:02}:{start.time().minute:02}"
         else:
             start_time = None
 
