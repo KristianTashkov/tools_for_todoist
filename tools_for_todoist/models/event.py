@@ -26,7 +26,7 @@ from dateutil.parser import parse
 from datetime import datetime
 from dateutil.tz import UTC, gettz
 
-from tools_for_todoist.utils import ensure_datetime
+from tools_for_todoist.utils import ensure_datetime, is_allday
 
 
 class CalendarEvent:
@@ -130,9 +130,9 @@ class CalendarEvent:
             return None
         rrule = [x for x in rrule.split('\n') if 'RRULE' in x][0]
 
-        match = re.search(r'(.*)T(\d\d:\d\d).*', self._get_start().isoformat())
-        if match:
-            start_time = f"at {match.groups()[1]}"
+        start = self._get_start()
+        if not is_allday(start):
+            start_time = f"at {start.time().hour}:{start.time().minute}"
         else:
             start_time = None
 
