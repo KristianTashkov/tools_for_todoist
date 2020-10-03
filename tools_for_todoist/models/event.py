@@ -23,7 +23,7 @@ import re
 from recurrent import format
 from dateutil.rrule import rrulestr
 from dateutil.parser import parse
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.tz import UTC, gettz
 
 from tools_for_todoist.utils import ensure_datetime, is_allday
@@ -56,8 +56,13 @@ class CalendarEvent:
         if rrule is None:
             return None
 
-        start_date = ensure_datetime(self._get_start())
-        return rrulestr(rrule, dtstart=start_date.astimezone(UTC), unfold=True)
+        start_date = self._get_start()
+        if not is_allday(start_date):
+            start_date = ensure_datetime(start_date).astimezone(UTC)
+        else:
+            start_date = ensure_datetime(start_date)
+        return rrulestr(rrule, dtstart=start_date, unfold=True)
+
 
     @staticmethod
     def from_raw(google_calendar, raw):
@@ -106,12 +111,16 @@ class CalendarEvent:
 
     def _last_occurrence(self):
         instances = self._get_rrule()
+        start = self._get_start()
         if instances is None:
-            return self._get_start()
+            return start
 
-        if instances.count() > 0:
-            return instances[-1]
-        return None
+        if instances.count() == 0:
+            return None
+        last_occurence = instances[-1]
+        if not is_allday(start):
+            last_occurence = last_occurence.astimezone(start.tzinfo)
+        return last_occurence.date() if is_allday(start) else last_occurence
 
     def next_occurrence(self):
         instances = self._get_rrule()
@@ -119,10 +128,11 @@ class CalendarEvent:
         if instances is None:
             return start if datetime.now(UTC) < ensure_datetime(start).astimezone(UTC) else None
 
-        next_occurence = instances.after(datetime.now(UTC), inc=True)
-        if next_occurence is not None:
-            return next_occurence.astimezone(start.tzinfo)
-        return None
+        now = datetime.now() if is_allday(start) else datetime.now(UTC)
+        next_occurence = instances.after(now, inc=True)
+        if next_occurence is not None and not is_allday(start):
+            next_occurence = next_occurence.astimezone(start.tzinfo)
+        return next_occurence.date() if is_allday(start) else next_occurence
 
     def recurrence_string(self):
         rrule = self._get_recurrence()
@@ -132,16 +142,17 @@ class CalendarEvent:
 
         start = self._get_start()
         if not is_allday(start):
-            start_time = f"at {start.time().hour:02}:{start.time().minute:02}"
+            start_time = f'at {start.time().hour:02}:{start.time().minute:02}'
         else:
-            start_time = None
+            start_time = ''
 
         formatted = format(rrule)
-        match = re.search(r'until (\d{4})(\d{2})(\d{2})T\d*Z', formatted)
+        match = re.search(r'until (.*)Z', formatted)
         if match is not None:
-            end_date = '-'.join(match.groups()[::-1])
+            until_date = parse(match.groups()[0])
+
             formatted = f'{formatted[:match.span()[0]]}'\
-                        f' {start_time} until {end_date}'\
+                        f' {start_time} until {until_date.date().isoformat()}'\
                         f'{formatted[match.span()[1]:]}'
             start_time = None
         match = re.search(r'(.*) of every month', formatted)
@@ -152,7 +163,8 @@ class CalendarEvent:
         formatted = re.sub(r'week on ', '', formatted)
         match = re.search(r'for ([\d]*) times|twice', formatted)
         if match:
-            last_instance = str(self._last_occurrence()).rpartition(' ')[0]
+            last_instance = self._last_occurrence()
+            last_instance = f'{last_instance.year}-{last_instance.month}-{last_instance.day}'
             formatted = f'{formatted[:match.span()[0]]}' \
                         f'{start_time} until {last_instance}' \
                         f'{formatted[match.span()[1]:]}'
@@ -173,4 +185,4 @@ class CalendarEvent:
     def __repr__(self):
         if self._raw['status'] == 'cancelled':
             return f"{self._id}: {self._raw['originalStartTime']} cancelled"
-        return f"{self._id}: {self.summary}, {self._get_start()}, {self._get_rrule()}"
+        return f"{self._id}: {self.summary}, {self._get_start()}, {self._raw.get('recurrence')}"

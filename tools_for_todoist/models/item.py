@@ -101,4 +101,4 @@ class TodoistItem:
     def __repr__(self):
         completed_string = 'X' if self.is_completed() else 'O'
         return f'{completed_string} {self.id}: content:{self.content}, '\
-               f'due: {self.next_due_date()}, string: {self.get_due_string()}'
+               f'due: {to_todoist_date(self.next_due_date())}, string: {self.get_due_string()}'
