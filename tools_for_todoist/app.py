@@ -32,7 +32,7 @@ if not os.path.exists(TODOIST_API_TOKEN_PATH):
     with open(TODOIST_API_TOKEN_PATH, 'w') as file:
         file.write(os.environ.get('TODOIST_API_KEY'))
 
-if not os.path.exists(TOKEN_CACHE_PATH):
+if not os.path.exists(TOKEN_CACHE_PATH) and 'GOOGLE_CALENDAR_TOKEN' in os.environ:
     with open(TOKEN_CACHE_PATH, 'w') as file:
         file.write(os.environ.get('GOOGLE_CALENDAR_TOKEN'))
 
