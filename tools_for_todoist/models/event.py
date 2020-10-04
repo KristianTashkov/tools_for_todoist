@@ -129,7 +129,13 @@ class CalendarEvent:
     
     def _find_next_occurence(self, rrule_instances):
         first_exception_start = min(
-            (x._get_start() for x in self.exceptions.values()),
+            (
+                start
+                for start in (
+                    x._get_start() for x in self.exceptions.values()
+                )
+                if start >= (datetime.now() if is_allday(start) else datetime.now(UTC))
+            ),
             default=None,
         )
         invalid_starts = [
