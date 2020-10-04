@@ -70,6 +70,7 @@ class GoogleCalendar:
         created_events = []
         cancelled_events = []
         updated_events = []
+        updated_events_ids = set()
         pending_exceptions = []
         cancelled_events_ids = set()
 
@@ -91,6 +92,7 @@ class GoogleCalendar:
                 old_event_copy = CalendarEvent.from_raw(self, event_model.raw())
                 event_model.update_from_raw(event)
                 updated_events.append((old_event_copy, event_model))
+                updated_events_ids.add(event['id'])
 
         for event in pending_exceptions:
             recurring_event_id = event.get('recurringEventId')
@@ -103,7 +105,9 @@ class GoogleCalendar:
             recurring_event = self._events[recurring_event_id]
             recurring_event.update_exception(event)
             # TODO(daniel): Implement this properly
-            updated_events.append((None, recurring_event))
+            if recurring_event_id not in updated_events_ids:
+                updated_events.append((None, recurring_event))
+                updated_events_ids.add(recurring_event_id)
 
         return {
             'created': created_events,
