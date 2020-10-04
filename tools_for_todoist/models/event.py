@@ -128,18 +128,13 @@ class CalendarEvent:
         return last_occurrence.date() if is_allday(start) else last_occurrence
     
     def _find_next_occurrence(self, rrule_instances):
-        first_exception_start = min(
-            (
-                start
-                for start in (
-                    x._get_start() 
-                    for x in self.exceptions.values()
-                    if not x.is_cancelled
-                )
-                if start >= (datetime.now() if is_allday(start) else datetime.now(UTC))
-            ),
-            default=None,
+        non_cancelled_exception_starts = x._get_start() for x in self.exceptions.values() if not x.is_cancelled
+        future_exception_starts = (
+            start
+            for start in non_cancelled_exception_starts
+            if start >= (datetime.now() if is_allday(start) else datetime.now(UTC))
         )
+        first_exception_start = min(future_exception_starts, default=None)
         invalid_starts = [
             x._get_original_start()
             for x in self.exceptions.values()
