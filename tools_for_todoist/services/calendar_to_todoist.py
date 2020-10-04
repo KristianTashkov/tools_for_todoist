@@ -90,6 +90,15 @@ class CalendarToTodoistService:
             if todoist_item is not None:
                 self.todoist.delete_item(todoist_item)
 
+    def _process_updated_event(self, old_calendar_event, calendar_event):
+        print('Updating event|', old_calendar_event, calendar_event)
+        todoist_id = _todoist_id(calendar_event)
+
+        if todoist_id is not None:
+            todoist_item = self.todoist.get_item_by_id(todoist_id)
+            if todoist_item is not None:
+                self._update_todoist_item(todoist_item, calendar_event)
+
     def _google_calendar_sync(self):
         sync_result = self.google_calendar.sync()
         new_event_item_links = []
@@ -101,6 +110,10 @@ class CalendarToTodoistService:
 
         for calendar_event in sync_result['cancelled']:
             self._process_cancelled_event(calendar_event)
+
+        for old_calendar_event, calendar_event in sync_result['updated']:
+            self._process_updated_event(old_calendar_event, calendar_event)
+
         return sync_result, new_event_item_links
 
     def _todoist_sync(self):

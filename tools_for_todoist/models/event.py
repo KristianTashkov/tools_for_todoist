@@ -71,11 +71,9 @@ class CalendarEvent:
         return event
 
     def update_from_raw(self, raw):
-        self._raw = raw
-        extended_properties = raw.get('extendedProperties')
-        if extended_properties is not None:
-            self._extended_properties = extended_properties
-        self.summary = raw.get('summary')
+        self._raw = copy.deepcopy(raw)
+        self._extended_properties = self._raw.get('extendedProperties')
+        self.summary = self._raw.get('summary')
 
     def update_exception(self, exception):
         if exception['id'] not in self.exceptions:
@@ -86,14 +84,14 @@ class CalendarEvent:
             self.exceptions[exception['id']].update_from_raw(exception)
 
     def save_private_info(self, key, value):
+        value = str(value)
         if self._extended_properties is None:
             self._extended_properties = {}
         else:
             self._extended_properties = copy.deepcopy(self._extended_properties)
         if 'private' not in self._extended_properties:
-            self._extended_properties['private'] = {key: value}
-        else:
-            self._extended_properties['private'][key] = value
+            self._extended_properties['private'] = {}
+        self._extended_properties['private'][key] = value
 
     def get_private_info(self, key):
         if self._extended_properties is None:

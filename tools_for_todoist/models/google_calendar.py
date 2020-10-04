@@ -87,8 +87,10 @@ class GoogleCalendar:
                 self._events[event['id']] = new_event
                 created_events.append(new_event)
             else:
-                self._events[event['id']].update_from_raw(event)
-                updated_events.append(event)
+                event_model = self._events[event['id']]
+                old_event_copy = CalendarEvent.from_raw(self, event_model.raw())
+                event_model.update_from_raw(event)
+                updated_events.append((old_event_copy, event_model))
 
         for event in pending_exceptions:
             recurring_event_id = event.get('recurringEventId')
