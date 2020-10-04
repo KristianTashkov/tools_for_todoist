@@ -106,12 +106,9 @@ class CalendarToTodoistService:
 
     def _todoist_sync(self):
         sync_result = self.todoist.sync()
-        for old_item, new_item in sync_result['updated']:
-            print('Updated Item|', old_item, new_item)
-            if _has_item_completed(old_item, new_item):
-                print('Completed item|', new_item)
-            elif old_item.is_completed() and not new_item.is_completed():
-                print('Uncompleted item|', new_item)
+        for item_id in sync_result['completed']:
+            item = self.todoist.get_item_by_id(item_id)
+            print('Completed Item|', item if item is not None else f'Deleted item {item_id}')
         return sync_result
 
     def sync(self):
