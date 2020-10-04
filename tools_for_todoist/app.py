@@ -43,10 +43,6 @@ sync_service = CalendarToTodoistService(calendar_id, todoist_project)
 while True:
     result = sync_service.sync()
     google_sync_result = result['google_calendar']
-    for event in google_sync_result['updated']:
-        print('RAW|Updated Event|', event)
-    for event in google_sync_result['exceptions']:
-        print('RAW|Event Instance|', event)
     todoist_sync_result = result['todoist']
     for item in todoist_sync_result['created']:
         print('RAW|Created Item|', item)

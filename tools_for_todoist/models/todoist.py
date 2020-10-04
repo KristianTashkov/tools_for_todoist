@@ -29,7 +29,14 @@ class Todoist:
         self.api = TodoistAPI(token)
         self.api.reset_state()
         self._items = {}
+        self._last_completed = None
+        self.active_project_id = -1
         self._initial_sync(active_project_name)
+
+    def _activity_sync(self, offset=0, limit=100):
+        return self.api.activity.get(
+            object_type='item', event_type='completed', parent_project_id=self.active_project_id,
+            offset=offset, limit=limit)
 
     def _initial_sync(self, active_project_name):
         self._initial_result = self.api.sync()
@@ -43,13 +50,29 @@ class Todoist:
             self._items[item['id']] = TodoistItem.from_raw(self, item)
         for item in self.api.items.get_completed(self.active_project_id):
             self._items[item['id']] = TodoistItem.from_raw(self, item)
+        activity_result = self._activity_sync(limit=1)
+        if activity_result['count']:
+            self._last_completed = activity_result['events'][0]['id']
 
-    def _safety_filter_item(self, item):
-        if item['type'] == 'item_add':
-            return item['args']['project_id'] == self.active_project_id
-        if item['type'] in ['item_update', 'item_delete']:
-            return self._items[item['args']['id']].project_id == self.active_project_id
-        return False
+    def _new_completed(self):
+        finished_processing = False
+        offset = 0
+        first_event = None
+        new_completed = set()
+
+        while not finished_processing:
+            activity_result = self._activity_sync(offset=offset)
+            offset += 100
+            finished_processing = offset > activity_result['count']
+            for event in activity_result['events']:
+                if first_event is None:
+                    first_event = event['id']
+                if event['id'] == self._last_completed:
+                    finished_processing = True
+                    break
+                new_completed.add(event['object_id'])
+        self._last_completed = first_event
+        return new_completed
 
     def _update_items(self, raw_updated_items):
         deleted_items = []
@@ -86,15 +109,18 @@ class Todoist:
         return item_raw.data
 
     def update_item(self, item, **kwargs):
-        print('Updating item|', item)
+        print(f'Updating item| {item} kwargs:{kwargs}')
         self.api.items.update(item.id, **kwargs)
 
     def delete_item(self, item):
         print('Deleting item|', item)
         self.api.items.delete(item.id)
 
+    def archive_item(self, item):
+        print('Archiving item|', item)
+        self.api.items.complete(item.id, force_history=True)
+
     def sync(self):
-        self.api.queue = [item for item in self.api.queue if self._safety_filter_item(item)]
         if len(self.api.queue) > 0:
             result = self.api.commit()
         else:
@@ -109,6 +135,7 @@ class Todoist:
                 if x['project_id'] == self.active_project_id or x['project_id'] == 0
             ]
             sync_result = self._update_items(active_project_item_updates)
+            sync_result['completed'] = self._new_completed()
         except:
             print('Todoist Sync Failed|', result)
             raise

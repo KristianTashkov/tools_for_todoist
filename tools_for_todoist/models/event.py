@@ -63,7 +63,6 @@ class CalendarEvent:
             start_date = ensure_datetime(start_date)
         return rrulestr(rrule, dtstart=start_date, unfold=True)
 
-
     @staticmethod
     def from_raw(google_calendar, raw):
         event = CalendarEvent(google_calendar)
@@ -72,11 +71,9 @@ class CalendarEvent:
         return event
 
     def update_from_raw(self, raw):
-        self._raw = raw
-        extended_properties = raw.get('extendedProperties')
-        if extended_properties is not None:
-            self._extended_properties = extended_properties
-        self.summary = raw.get('summary')
+        self._raw = copy.deepcopy(raw)
+        self._extended_properties = self._raw.get('extendedProperties')
+        self.summary = self._raw.get('summary')
 
     def update_exception(self, exception):
         if exception['id'] not in self.exceptions:
@@ -87,14 +84,14 @@ class CalendarEvent:
             self.exceptions[exception['id']].update_from_raw(exception)
 
     def save_private_info(self, key, value):
+        value = str(value)
         if self._extended_properties is None:
             self._extended_properties = {}
         else:
             self._extended_properties = copy.deepcopy(self._extended_properties)
         if 'private' not in self._extended_properties:
-            self._extended_properties['private'] = {key: value}
-        else:
-            self._extended_properties['private'][key] = value
+            self._extended_properties['private'] = {}
+        self._extended_properties['private'][key] = value
 
     def get_private_info(self, key):
         if self._extended_properties is None:
@@ -159,8 +156,11 @@ class CalendarEvent:
         if instances is None:
             return start if datetime.now(UTC) < ensure_datetime(start).astimezone(UTC) else None
 
+        now = datetime.now() if is_allday(start) else datetime.now(UTC)
         next_occurrence = self._find_next_occurrence(instances)
-        if next_occurrence is not None and not is_allday(start):
+        if next_occurrence is None:
+            return None
+        if not is_allday(start):
             next_occurrence = next_occurrence.astimezone(start.tzinfo)
         return next_occurrence.date() if is_allday(start) else next_occurrence
 
@@ -202,6 +202,9 @@ class CalendarEvent:
         if start_time is not None:
             formatted += f' {start_time}'
         return formatted
+
+    def html_link(self):
+        return self._raw['htmlLink']
 
     def save(self):
         updated_fields = {}
