@@ -102,6 +102,7 @@ class GoogleCalendar:
                 continue
             recurring_event_model = self._events[recurring_event_id]
             old_event_copy = CalendarEvent.from_raw(self, recurring_event_model.raw())
+            old_event_copy.exceptions.update(recurring_event_model.exceptions)
             recurring_event_model.update_exception(event)
             updated_events.append((old_event_copy, recurring_event_model))
 
