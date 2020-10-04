@@ -141,19 +141,17 @@ class CalendarEvent:
             x._get_original_start()
             for x in self.exceptions.values()
         ]
-        first_moment = datetime.now() if is_allday(self._get_start()) else datetime.now(UTC)
-        inc = True
-        while True:
-            next_regular_occurrence = rrule_instances.after(first_moment, inc=inc)
+        for next_regular_occurrence in rrule_instances.xafter(
+            datetime.now() if is_allday(self._get_start()) else datetime.now(UTC), inc=True
+        ):
             if (
-                next_regular_occurrence is None or 
-                (first_exception_start is not None and first_exception_start < next_regular_occurrence)
+                first_exception_start is not None and
+                first_exception_start < next_regular_occurrence
             ):
                 return first_exception_start
             if next_regular_occurrence not in exception_original_starts:
                 return next_regular_occurrence
-            first_moment = next_regular_occurrence
-            inc = False
+        return first_exception_start
 
     def next_occurrence(self):
         instances = self._get_rrule()
