@@ -127,7 +127,9 @@ class CalendarEvent:
 
         now = datetime.now() if is_allday(start) else datetime.now(UTC)
         next_occurence = instances.after(now, inc=True)
-        if next_occurence is not None and not is_allday(start):
+        if next_occurence is None:
+            return None
+        if not is_allday(start):
             next_occurence = next_occurence.astimezone(start.tzinfo)
         return next_occurence.date() if is_allday(start) else next_occurence
 

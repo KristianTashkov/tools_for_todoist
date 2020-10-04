@@ -76,7 +76,7 @@ class CalendarToTodoistService:
                 item = self._create_todoist_item(calendar_event)
                 return calendar_event, item
 
-            self.todoist.delete_item(todoist_item)
+            self.todoist.archive_item(todoist_item)
             return None
 
         calendar_id = calendar_event.get_private_info(CALENDAR_EVENT_ID)
@@ -113,7 +113,7 @@ class CalendarToTodoistService:
             return calendar_event, item
 
         if calendar_event.next_occurrence() is None:
-            self.todoist.delete_item(todoist_item)
+            self.todoist.archive_item(todoist_item)
             return None
 
         self._update_todoist_item(todoist_item, calendar_event)

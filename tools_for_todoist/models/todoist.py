@@ -74,13 +74,6 @@ class Todoist:
         self._last_completed = first_event
         return new_completed
 
-    def _safety_filter_item(self, item):
-        if item['type'] == 'item_add':
-            return item['args']['project_id'] == self.active_project_id
-        if item['type'] in ['item_update', 'item_delete']:
-            return self._items[item['args']['id']].project_id == self.active_project_id
-        return False
-
     def _update_items(self, raw_updated_items):
         deleted_items = []
         new_items = []
@@ -123,8 +116,11 @@ class Todoist:
         print('Deleting item|', item)
         self.api.items.delete(item.id)
 
+    def archive_item(self, item):
+        print('Archiving item|', item)
+        self.api.items.complete(item.id, force_history=True)
+
     def sync(self):
-        self.api.queue = [item for item in self.api.queue if self._safety_filter_item(item)]
         if len(self.api.queue) > 0:
             result = self.api.commit()
         else:
