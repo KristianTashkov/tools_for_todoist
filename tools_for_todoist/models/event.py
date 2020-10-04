@@ -138,7 +138,9 @@ class CalendarEvent:
             inc = False
     
     def _find_next_occurrence(self, rrule_instances):
-        non_cancelled_exception_starts = (x._get_start() for x in self.exceptions.values() if not x.is_cancelled)
+        non_cancelled_exception_starts = (
+            x._get_start() for x in self.exceptions.values() if not x._get_is_cancelled()
+        )
         future_exception_starts = (
             start
             for start in non_cancelled_exception_starts
@@ -213,11 +215,10 @@ class CalendarEvent:
         if updated_fields:
             self.google_calendar.update_event(self._id, updated_fields)
     
-    @property
-    def is_cancelled(self):
+    def _get_is_cancelled(self):
         return self._raw['status'] == 'cancelled'
 
     def __repr__(self):
-        if self.is_cancelled:
+        if self._get_is_cancelled():
             return f"{self._id}: {self._raw['originalStartTime']} cancelled"
         return f"{self._id}: {self.summary}, {self._get_start()}, {self._raw.get('recurrence')}"
