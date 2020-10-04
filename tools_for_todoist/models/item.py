@@ -74,9 +74,19 @@ class TodoistItem:
         if next_date is None and due_string is None:
             self._due = None
             return
+
+        next_date, next_timezone = to_todoist_date(next_date) if next_date else (None, None)
+        if (
+            self._due is not None and
+            self._due.get('date') == next_date and
+            self._due.get('timezone') == next_timezone and
+            self._due.get('string') == due_string
+        ):
+            return
+
         self._due = {}
         if next_date is not None:
-            self._due['date'], self._due['timezone'] = to_todoist_date(next_date)
+            self._due['date'], self._due['timezone'] = next_date, next_timezone
         if due_string is not None:
             self._due['string'] = due_string
 

@@ -116,7 +116,7 @@ class Todoist:
         return item_raw.data
 
     def update_item(self, item, **kwargs):
-        print('Updating item|', item)
+        print(f'Updating item| {item} kwargs:{kwargs}')
         self.api.items.update(item.id, **kwargs)
 
     def delete_item(self, item):
