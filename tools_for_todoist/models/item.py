@@ -76,11 +76,15 @@ class TodoistItem:
             return
 
         next_date, next_timezone = to_todoist_date(next_date) if next_date else (None, None)
+        same_recurrence = (
+                self._due.get('string') == due_string or
+                (not self.is_recurring() and due_string is None)
+        )
         if (
             self._due is not None and
             self._due.get('date') == next_date and
             self._due.get('timezone') == next_timezone and
-            self._due.get('string') == due_string
+            same_recurrence
         ):
             return
 
