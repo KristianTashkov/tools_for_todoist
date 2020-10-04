@@ -26,7 +26,7 @@ from dateutil.parser import parse
 from datetime import datetime
 from dateutil.tz import UTC, gettz
 
-from tools_for_todoist.utils import ensure_datetime, is_allday
+from tools_for_todoist.utils import ensure_datetime, is_allday, now_as
 
 
 class CalendarEvent:
@@ -98,13 +98,18 @@ class CalendarEvent:
             return None
         return self._extended_properties.get('private', {}).get(key)
 
-    def _get_start(self):
-        raw_start = self._raw['start']
+    def _parse_start(self, raw_start):
         if 'date' in raw_start:
             return parse(raw_start['date']).date()
         dt = parse(raw_start['dateTime'])
         time_zone = raw_start.get('timeZone', self.google_calendar.default_timezone)
         return dt.astimezone(gettz(time_zone))
+
+    def _get_start(self):
+        return self._parse_start(self._raw['start'])
+
+    def _get_original_start(self):
+        return self._parse_start(self._raw['originalStartTime'])
 
     def _last_occurrence(self):
         instances = self._get_rrule()
@@ -114,10 +119,34 @@ class CalendarEvent:
 
         if instances.count() == 0:
             return None
-        last_occurence = instances[-1]
+        last_occurrence = instances[-1]
         if not is_allday(start):
-            last_occurence = last_occurence.astimezone(start.tzinfo)
-        return last_occurence.date() if is_allday(start) else last_occurence
+            last_occurrence = last_occurrence.astimezone(start.tzinfo)
+        return last_occurrence.date() if is_allday(start) else last_occurrence
+    
+    def _find_next_occurrence(self, rrule_instances):
+        non_cancelled_exception_starts = (
+            x._get_start() for x in self.exceptions.values() if not x._get_is_cancelled()
+        )
+        future_exception_starts = (
+            start
+            for start in non_cancelled_exception_starts
+            if start >= now_as(start)
+        )
+        first_exception_start = min(future_exception_starts, default=None)
+        exception_original_starts = {
+            x._get_original_start()
+            for x in self.exceptions.values()
+        }
+        for next_regular_occurrence in rrule_instances.xafter(now_as(self._get_start()), inc=True):
+            if (
+                first_exception_start is not None and
+                first_exception_start < next_regular_occurrence
+            ):
+                return first_exception_start
+            if next_regular_occurrence not in exception_original_starts:
+                return next_regular_occurrence
+        return first_exception_start
 
     def next_occurrence(self):
         instances = self._get_rrule()
@@ -125,13 +154,12 @@ class CalendarEvent:
         if instances is None:
             return start if datetime.now(UTC) < ensure_datetime(start).astimezone(UTC) else None
 
-        now = datetime.now() if is_allday(start) else datetime.now(UTC)
-        next_occurence = instances.after(now, inc=True)
-        if next_occurence is None:
+        next_occurrence = self._find_next_occurrence(instances)
+        if next_occurrence is None:
             return None
         if not is_allday(start):
-            next_occurence = next_occurence.astimezone(start.tzinfo)
-        return next_occurence.date() if is_allday(start) else next_occurence
+            next_occurrence = next_occurrence.astimezone(start.tzinfo)
+        return next_occurrence.date() if is_allday(start) else next_occurrence
 
     def recurrence_string(self):
         rrule = self._get_recurrence()
@@ -183,8 +211,11 @@ class CalendarEvent:
             updated_fields['extendedProperties'] = self._extended_properties
         if updated_fields:
             self.google_calendar.update_event(self._id, updated_fields)
+    
+    def _get_is_cancelled(self):
+        return self._raw['status'] == 'cancelled'
 
     def __repr__(self):
-        if self._raw['status'] == 'cancelled':
+        if self._get_is_cancelled():
             return f"{self._id}: {self._raw['originalStartTime']} cancelled"
         return f"{self._id}: {self.summary}, {self._get_start()}, {self._raw.get('recurrence')}"
