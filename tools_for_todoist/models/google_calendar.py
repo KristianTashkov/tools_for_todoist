@@ -100,7 +100,10 @@ class GoogleCalendar:
                 print(
                     "Skipping recurring event exception for missing event: ", event)
                 continue
-            self._events[recurring_event_id].update_exception(event)
+            recurring_event = self._events[recurring_event_id]
+            recurring_event.update_exception(event)
+            # TODO(daniel): Implement this properly
+            updated_events.append((None, recurring_event))
 
         return {
             'created': created_events,
