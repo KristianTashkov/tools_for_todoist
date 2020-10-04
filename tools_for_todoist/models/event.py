@@ -132,7 +132,9 @@ class CalendarEvent:
             (
                 start
                 for start in (
-                    x._get_start() for x in self.exceptions.values()
+                    x._get_start() 
+                    for x in self.exceptions.values()
+                    if not x.is_cancelled
                 )
                 if start >= (datetime.now() if is_allday(start) else datetime.now(UTC))
             ),
@@ -215,8 +217,12 @@ class CalendarEvent:
             updated_fields['extendedProperties'] = self._extended_properties
         if updated_fields:
             self.google_calendar.update_event(self._id, updated_fields)
+    
+    @property
+    def is_cancelled(self):
+        return self._raw['status'] == 'cancelled'
 
     def __repr__(self):
-        if self._raw['status'] == 'cancelled':
+        if self.is_cancelled:
             return f"{self._id}: {self._raw['originalStartTime']} cancelled"
         return f"{self._id}: {self.summary}, {self._get_start()}, {self._raw.get('recurrence')}"
