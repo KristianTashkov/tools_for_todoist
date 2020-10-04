@@ -101,13 +101,18 @@ class CalendarEvent:
             return None
         return self._extended_properties.get('private', {}).get(key)
 
-    def _get_start(self):
-        raw_start = self._raw['start']
+    def _parse_start(self, raw_start):
         if 'date' in raw_start:
             return parse(raw_start['date']).date()
         dt = parse(raw_start['dateTime'])
         time_zone = raw_start.get('timeZone', self.google_calendar.default_timezone)
         return dt.astimezone(gettz(time_zone))
+
+    def _get_start(self):
+        return self._parse_start(self._raw['start'])
+
+    def _get_original_start(self):
+        return self._parse_start(self._raw['originalStartTime'])
 
     def _last_occurrence(self):
         instances = self._get_rrule()
@@ -121,6 +126,30 @@ class CalendarEvent:
         if not is_allday(start):
             last_occurence = last_occurence.astimezone(start.tzinfo)
         return last_occurence.date() if is_allday(start) else last_occurence
+    
+    def _find_next_occurence(self, rrule_instances):
+        first_exception_start = min(
+            (x._get_start() for x in self.exceptions.values()),
+            default=None,
+        )
+        invalid_starts = [
+            x._get_original_start()
+            for x in self.exceptions.values()
+        ]
+        first_moment = datetime.now() if is_allday(self._get_start()) else datetime.now(UTC)
+        inc = True
+        for _ in range(len(self.exceptions) + 1):
+            next_regular_occurence = rrule_instances.after(first_moment, inc=inc)
+            if next_regular_occurence not in invalid_starts:
+                break
+            first_moment = next_regular_occurence
+            inc = False
+            continue
+        else:
+            assert False
+        if first_exception_start is None:
+            return next_regular_occurence
+        return min(first_exception_start, next_regular_occurence)
 
     def next_occurrence(self):
         instances = self._get_rrule()
@@ -128,8 +157,7 @@ class CalendarEvent:
         if instances is None:
             return start if datetime.now(UTC) < ensure_datetime(start).astimezone(UTC) else None
 
-        now = datetime.now() if is_allday(start) else datetime.now(UTC)
-        next_occurence = instances.after(now, inc=True)
+        next_occurence = self._find_next_occurence(instances)
         if next_occurence is not None and not is_allday(start):
             next_occurence = next_occurence.astimezone(start.tzinfo)
         return next_occurence.date() if is_allday(start) else next_occurence
