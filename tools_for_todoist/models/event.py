@@ -26,7 +26,7 @@ from dateutil.parser import parse
 from datetime import datetime
 from dateutil.tz import UTC, gettz
 
-from tools_for_todoist.utils import ensure_datetime, is_allday
+from tools_for_todoist.utils import ensure_datetime, is_allday, now_as
 
 
 class CalendarEvent:
@@ -131,16 +131,14 @@ class CalendarEvent:
         future_exception_starts = (
             start
             for start in non_cancelled_exception_starts
-            if start >= (datetime.now() if is_allday(start) else datetime.now(UTC))
+            if start >= now_as(start)
         )
         first_exception_start = min(future_exception_starts, default=None)
-        exception_original_starts = [
+        exception_original_starts = {
             x._get_original_start()
             for x in self.exceptions.values()
-        ]
-        for next_regular_occurrence in rrule_instances.xafter(
-            datetime.now() if is_allday(self._get_start()) else datetime.now(UTC), inc=True
-        ):
+        }
+        for next_regular_occurrence in rrule_instances.xafter(now_as(self._get_start()), inc=True):
             if (
                 first_exception_start is not None and
                 first_exception_start < next_regular_occurrence
@@ -156,7 +154,6 @@ class CalendarEvent:
         if instances is None:
             return start if datetime.now(UTC) < ensure_datetime(start).astimezone(UTC) else None
 
-        now = datetime.now() if is_allday(start) else datetime.now(UTC)
         next_occurrence = self._find_next_occurrence(instances)
         if next_occurrence is None:
             return None

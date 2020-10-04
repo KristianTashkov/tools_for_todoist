@@ -26,6 +26,10 @@ def is_allday(dt):
     return isinstance(dt, dt_date) and not isinstance(dt, dt_datetime)
 
 
+def now_as(dt):
+    return (dt_datetime.now() if is_allday(dt) else dt_datetime.now(UTC))
+
+
 def ensure_datetime(dt):
     if not is_allday(dt):
         return dt
