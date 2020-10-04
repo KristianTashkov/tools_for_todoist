@@ -127,16 +127,6 @@ class CalendarEvent:
             last_occurrence = last_occurrence.astimezone(start.tzinfo)
         return last_occurrence.date() if is_allday(start) else last_occurrence
     
-    def _find_first_non_exception_instance(self, rrule_instances, exception_original_starts):
-        first_moment = datetime.now() if is_allday(self._get_start()) else datetime.now(UTC)
-        inc = True
-        while True:
-            next_regular_occurrence = rrule_instances.after(first_moment, inc=inc)
-            if next_regular_occurrence not in exception_original_starts:
-                return next_regular_occurrence
-            first_moment = next_regular_occurrence
-            inc = False
-    
     def _find_next_occurrence(self, rrule_instances):
         non_cancelled_exception_starts = (
             x._get_start() for x in self.exceptions.values() if not x._get_is_cancelled()
@@ -151,10 +141,19 @@ class CalendarEvent:
             x._get_original_start()
             for x in self.exceptions.values()
         ]
-        next_regular_occurrence = self._find_first_non_exception_instance(rrule_instances, exception_original_starts)
-        if first_exception_start is None:
-            return next_regular_occurrence
-        return min(first_exception_start, next_regular_occurrence)
+        first_moment = datetime.now() if is_allday(self._get_start()) else datetime.now(UTC)
+        inc = True
+        while True:
+            next_regular_occurrence = rrule_instances.after(first_moment, inc=inc)
+            if (
+                next_regular_occurrence is None or 
+                (first_exception_start is not None and first_exception_start < next_regular_occurrence)
+            ):
+                return first_exception_start
+            if next_regular_occurrence not in exception_original_starts:
+                return next_regular_occurrence
+            first_moment = next_regular_occurrence
+            inc = False
 
     def next_occurrence(self):
         instances = self._get_rrule()
