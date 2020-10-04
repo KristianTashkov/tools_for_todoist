@@ -73,8 +73,7 @@ class CalendarToTodoistService:
 
             todoist_item = self.todoist.get_item_by_id(int(todoist_id))
             if todoist_item is None:
-                item = self._create_todoist_item(calendar_event)
-                return calendar_event, item
+                return
 
             self.todoist.archive_item(todoist_item)
             return None
@@ -108,16 +107,17 @@ class CalendarToTodoistService:
             return None
 
         todoist_item = self.todoist.get_item_by_id(todoist_id)
-        if todoist_item is None:
-            item = self._create_todoist_item(calendar_event)
-            return calendar_event, item
-
         if calendar_event.next_occurrence() is None:
-            self.todoist.archive_item(todoist_item)
+            if todoist_item is not None:
+                self.todoist.archive_item(todoist_item)
             return None
 
-        self._update_todoist_item(todoist_item, calendar_event)
-        return None
+        if todoist_item is not None:
+            self._update_todoist_item(todoist_item, calendar_event)
+            return None
+
+        item = self._create_todoist_item(calendar_event)
+        return calendar_event, item
 
     def _google_calendar_sync(self):
         sync_result = self.google_calendar.sync()
