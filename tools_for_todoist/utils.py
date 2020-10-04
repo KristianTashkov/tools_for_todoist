@@ -29,7 +29,7 @@ def is_allday(dt):
 def ensure_datetime(dt):
     if not is_allday(dt):
         return dt
-    return dt_datetime.combine(dt, dt_datetime.min.time()).astimezone(UTC)
+    return dt_datetime.combine(dt, dt_datetime.min.time())
 
 
 def to_todoist_date(dt):
