@@ -21,7 +21,6 @@ import re
 from tools_for_todoist.models.google_calendar import GoogleCalendar
 from tools_for_todoist.models.item import TodoistItem
 from tools_for_todoist.models.todoist import Todoist
-from tools_for_todoist.utils import ensure_datetime
 
 CALENDAR_EVENT_TODOIST_KEY = 'todoist_item_id'
 CALENDAR_EVENT_ID = 'calendar_event_id'
@@ -36,20 +35,18 @@ def _todoist_id(calendar_event):
     return int(todoist_id)
 
 
-def _has_item_completed(old_item, new_item):
-    if not old_item.is_completed() and new_item.is_completed():
-        return True
-    old_due = old_item.next_due_date()
-    new_due = new_item.next_due_date()
-    if old_due is None or new_due is None:
-        return False
-    return ensure_datetime(old_due) < ensure_datetime(new_due)
+def _todoist_title(calendar_event):
+    return f'[{calendar_event.summary}]({calendar_event.html_link()})'
 
 
 class CalendarToTodoistService:
     def __init__(self, calendar_id, todoist_project):
         self.todoist = Todoist(todoist_project)
         self.google_calendar = GoogleCalendar(calendar_id)
+
+    def _update_todoist_item(self, todoist_item, calendar_event):
+        todoist_item.content = _todoist_title(calendar_event)
+        todoist_item.save()
 
     def _process_new_event(self, calendar_event):
         print('Processing new event|', calendar_event)
@@ -72,10 +69,12 @@ class CalendarToTodoistService:
                 self.todoist.get_item_by_id(todoist_id) is not None and
                 calendar_id == calendar_event.id()
         ):
+            self._update_todoist_item(self.todoist.get_item_by_id(todoist_id), calendar_event)
             return
 
+        todoist_title = _todoist_title(calendar_event)
         item = TodoistItem(
-            self.todoist, calendar_event.summary, self.todoist.active_project_id)
+            self.todoist, todoist_title, self.todoist.active_project_id)
         item.set_due(
             next_occurence,
             calendar_event.recurrence_string())

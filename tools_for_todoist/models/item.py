@@ -98,6 +98,8 @@ class TodoistItem:
             updated_rows['priority'] = self.priority
         if self._due != self._raw['due']:
             updated_rows['due'] = self._due
+        if len(updated_rows) == 0:
+            return None
         return self.todoist.update_item(self, **updated_rows)
 
     def __repr__(self):

@@ -63,7 +63,6 @@ class CalendarEvent:
             start_date = ensure_datetime(start_date)
         return rrulestr(rrule, dtstart=start_date, unfold=True)
 
-
     @staticmethod
     def from_raw(google_calendar, raw):
         event = CalendarEvent(google_calendar)
@@ -172,6 +171,9 @@ class CalendarEvent:
         if start_time is not None:
             formatted += f' {start_time}'
         return formatted
+
+    def html_link(self):
+        return self._raw['htmlLink']
 
     def save(self):
         updated_fields = {}
