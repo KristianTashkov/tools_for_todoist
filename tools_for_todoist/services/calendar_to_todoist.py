@@ -67,7 +67,6 @@ class CalendarToTodoistService:
         return item
 
     def _process_new_event(self, calendar_event):
-        print('Processing new event|', calendar_event)
         todoist_id = _todoist_id(calendar_event)
         if todoist_id is not None:
             self.item_to_event[todoist_id] = calendar_event
@@ -82,6 +81,7 @@ class CalendarToTodoistService:
             self.todoist.archive_item(todoist_item)
             return None
 
+        print('Processing new event|', calendar_event)
         calendar_id = calendar_event.get_private_info(CALENDAR_EVENT_ID)
         if (
                 todoist_id is not None and
@@ -104,7 +104,6 @@ class CalendarToTodoistService:
                 self.todoist.delete_item(todoist_item)
 
     def _process_updated_event(self, old_calendar_event, calendar_event):
-        print('Updating event|', old_calendar_event, calendar_event)
         todoist_id = _todoist_id(calendar_event)
 
         if todoist_id is None:
@@ -116,6 +115,7 @@ class CalendarToTodoistService:
                 self.todoist.archive_item(todoist_item)
             return None
 
+        print('Updating event|', old_calendar_event, calendar_event)
         if todoist_item is not None:
             self._update_todoist_item(todoist_item, calendar_event)
             return None
