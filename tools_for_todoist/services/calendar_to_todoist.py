@@ -36,23 +36,25 @@ def _todoist_id(calendar_event):
 
 
 def _todoist_title(calendar_event):
-    return f'[{calendar_event.summary}]({calendar_event.html_link()})'
+    title = calendar_event.summary if calendar_event.summary is not None else '(No title)'
+    return f'[{title}]({calendar_event.html_link()})'
 
 
 class CalendarToTodoistService:
     def __init__(self, calendar_id, todoist_project):
         self.todoist = Todoist(todoist_project)
         self.google_calendar = GoogleCalendar(calendar_id)
+        self.item_to_event = {}
 
     def _update_todoist_item(self, todoist_item, calendar_event):
         if todoist_item.is_completed():
-            return
+            return False
 
         todoist_item.content = _todoist_title(calendar_event)
         todoist_item.set_due(
             calendar_event.next_occurrence(),
             calendar_event.recurrence_string())
-        todoist_item.save()
+        return todoist_item.save()
 
     def _create_todoist_item(self, calendar_event):
         todoist_title = _todoist_title(calendar_event)
@@ -67,6 +69,8 @@ class CalendarToTodoistService:
     def _process_new_event(self, calendar_event):
         print('Processing new event|', calendar_event)
         todoist_id = _todoist_id(calendar_event)
+        if todoist_id is not None:
+            self.item_to_event[todoist_id] = calendar_event
         if calendar_event.next_occurrence() is None:
             if todoist_id is None:
                 return None
@@ -139,22 +143,34 @@ class CalendarToTodoistService:
         return sync_result, new_event_item_links
 
     def _todoist_sync(self):
-        sync_result = self.todoist.sync()
-        for item_id in sync_result['completed']:
-            item = self.todoist.get_item_by_id(item_id)
-            print('Completed Item|', item if item is not None else f'Deleted item {item_id}')
-        return sync_result
+        should_sync = True
+        sync_results = []
+        while should_sync:
+            sync_result = self.todoist.sync()
+            should_sync = False
+
+            for item_id in sync_result['completed']:
+                item = self.todoist.get_item_by_id(item_id)
+                print('Completed Item|', item if item is not None else f'Deleted item {item_id}')
+                if item is not None and item_id:
+                    if item_id not in self.item_to_event:
+                        print('ERROR|Link to calendar event missing for', item_id)
+                        continue
+                    should_sync |= self._update_todoist_item(item, self.item_to_event[item_id])
+            sync_results.append(sync_result)
+        return sync_results
 
     def sync(self):
         google_calendar_sync_result, new_event_item_links = self._google_calendar_sync()
-        todoist_sync_result = self._todoist_sync()
+        todoist_sync_results = self._todoist_sync()
 
         for calendar_event, todoist_item in new_event_item_links:
             calendar_event.save_private_info(CALENDAR_EVENT_TODOIST_KEY, todoist_item.id)
             calendar_event.save_private_info(CALENDAR_EVENT_ID, calendar_event.id())
             calendar_event.save()
+            self.item_to_event[todoist_item.id] = calendar_event
 
         return {
-            'todoist': todoist_sync_result,
+            'todoist': todoist_sync_results,
             'google_calendar': google_calendar_sync_result
         }

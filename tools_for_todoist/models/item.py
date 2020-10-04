@@ -77,7 +77,7 @@ class TodoistItem:
 
         next_date, next_timezone = to_todoist_date(next_date) if next_date else (None, None)
         same_recurrence = (
-                self._due.get('string') == due_string or
+                (self._due or {}).get('string') == due_string or
                 (not self.is_recurring() and due_string is None)
         )
         if (
@@ -103,7 +103,7 @@ class TodoistItem:
         if self.id == -1:
             self._raw = self.todoist.add_item(self)
             self.id = self._raw['id']
-            return self._raw
+            return True
 
         updated_rows = {}
         if self.content != self._raw['content']:
@@ -113,8 +113,9 @@ class TodoistItem:
         if self._due != self._raw['due']:
             updated_rows['due'] = self._due
         if len(updated_rows) == 0:
-            return None
-        return self.todoist.update_item(self, **updated_rows)
+            return False
+        self.todoist.update_item(self, **updated_rows)
+        return True
 
     def __repr__(self):
         completed_string = 'X' if self.is_completed() else 'O'
