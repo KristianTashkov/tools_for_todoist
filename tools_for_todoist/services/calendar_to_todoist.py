@@ -79,7 +79,7 @@ class CalendarToTodoistService:
                 return None
 
             todoist_item = self.todoist.get_item_by_id(int(todoist_id))
-            if todoist_item is None:
+            if todoist_item is None or todoist_item.is_completed():
                 return
 
             self.todoist.archive_item(todoist_item)
@@ -122,7 +122,7 @@ class CalendarToTodoistService:
 
         todoist_item = self.todoist.get_item_by_id(todoist_id)
         if calendar_event.next_occurrence() is None:
-            if todoist_item is not None:
+            if todoist_item is not None and not todoist_item.is_completed():
                 self.todoist.archive_item(todoist_item)
             return None
 
