@@ -70,7 +70,11 @@ class Todoist:
                 if event['id'] == self._last_completed:
                     finished_processing = True
                     break
-                new_completed.add(event['object_id'])
+                item_id = event['object_id']
+                old_item = self._items.get(item_id)
+                if old_item is not None:
+                    old_item = TodoistItem.from_raw(self, old_item.raw())
+                new_completed.add((old_item, item_id))
         self._last_completed = first_event
         return new_completed
 
@@ -121,6 +125,7 @@ class Todoist:
         self.api.items.complete(item.id, force_history=True)
 
     def sync(self):
+        new_completed = self._new_completed()
         if len(self.api.queue) > 0:
             result = self.api.commit()
         else:
@@ -135,10 +140,10 @@ class Todoist:
                 if x['project_id'] == self.active_project_id or x['project_id'] == 0
             ]
             sync_result = self._update_items(active_project_item_updates)
-            sync_result['completed'] = self._new_completed()
         except:
             print('Todoist Sync Failed|', result)
             raise
         sync_result['raw'] = result
+        sync_result['completed'] = new_completed
         return sync_result
 

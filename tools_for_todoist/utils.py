@@ -26,14 +26,15 @@ def is_allday(dt):
     return isinstance(dt, dt_date) and not isinstance(dt, dt_datetime)
 
 
-def now_as(dt):
-    return (dt_datetime.now() if is_allday(dt) else dt_datetime.now(UTC))
-
-
 def ensure_datetime(dt):
     if not is_allday(dt):
         return dt
     return dt_datetime.combine(dt, dt_datetime.min.time())
+
+
+def datetime_as(dt, compare_dt):
+    dt = ensure_datetime(dt)
+    return dt.date() if is_allday(compare_dt) else dt
 
 
 def to_todoist_date(dt):

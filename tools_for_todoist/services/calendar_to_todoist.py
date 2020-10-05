@@ -17,7 +17,10 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 import re
+from datetime import datetime
+from dateutil.tz import UTC
 
+from tools_for_todoist.models.event import CALENDAR_LAST_COMPLETED
 from tools_for_todoist.models.google_calendar import GoogleCalendar
 from tools_for_todoist.models.item import TodoistItem
 from tools_for_todoist.models.todoist import Todoist
@@ -70,6 +73,7 @@ class CalendarToTodoistService:
         todoist_id = _todoist_id(calendar_event)
         if todoist_id is not None:
             self.item_to_event[todoist_id] = calendar_event
+
         if calendar_event.next_occurrence() is None:
             if todoist_id is None:
                 return None
@@ -88,7 +92,14 @@ class CalendarToTodoistService:
                 self.todoist.get_item_by_id(todoist_id) is not None and
                 calendar_id == calendar_event.id()
         ):
-            self._update_todoist_item(self.todoist.get_item_by_id(todoist_id), calendar_event)
+            todoist_item = self.todoist.get_item_by_id(todoist_id)
+            if calendar_event.get_private_info(CALENDAR_LAST_COMPLETED) is None:
+                print(
+                    'Linked Event with missing last completion info', calendar_event, todoist_item)
+                calendar_event.save_private_info(
+                    CALENDAR_LAST_COMPLETED, datetime.now().astimezone(UTC))
+                calendar_event.save()
+            self._update_todoist_item(todoist_item, calendar_event)
             return None
 
         item = self._create_todoist_item(calendar_event)
@@ -149,14 +160,18 @@ class CalendarToTodoistService:
             sync_result = self.todoist.sync()
             should_sync = False
 
-            for item_id in sync_result['completed']:
+            for old_item, item_id in sync_result['completed']:
                 item = self.todoist.get_item_by_id(item_id)
                 print('Completed Item|', item if item is not None else f'Deleted item {item_id}')
-                if item is not None and item_id:
+                if item is not None:
                     if item_id not in self.item_to_event:
                         print('ERROR|Link to calendar event missing for', item_id)
                         continue
-                    should_sync |= self._update_todoist_item(item, self.item_to_event[item_id])
+                    calendar_event = self.item_to_event[item_id]
+                    should_sync |= self._update_todoist_item(item, calendar_event)
+                    calendar_event.save_private_info(
+                        CALENDAR_LAST_COMPLETED, old_item.next_due_date())
+                    calendar_event.save()
             sync_results.append(sync_result)
         return sync_results
 
@@ -164,9 +179,11 @@ class CalendarToTodoistService:
         google_calendar_sync_result, new_event_item_links = self._google_calendar_sync()
         todoist_sync_results = self._todoist_sync()
 
+        now = datetime.now(UTC)
         for calendar_event, todoist_item in new_event_item_links:
             calendar_event.save_private_info(CALENDAR_EVENT_TODOIST_KEY, todoist_item.id)
             calendar_event.save_private_info(CALENDAR_EVENT_ID, calendar_event.id())
+            calendar_event.save_private_info(CALENDAR_LAST_COMPLETED, now)
             calendar_event.save()
             self.item_to_event[todoist_item.id] = calendar_event
 

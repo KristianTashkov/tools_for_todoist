@@ -21,12 +21,15 @@ import re
 
 
 from recurrent import format
+from datetime import datetime
 from dateutil.rrule import rrulestr
 from dateutil.parser import parse
-from datetime import datetime
 from dateutil.tz import UTC, gettz
 
-from tools_for_todoist.utils import ensure_datetime, is_allday, now_as
+from tools_for_todoist.utils import ensure_datetime, is_allday, datetime_as
+
+
+CALENDAR_LAST_COMPLETED = 'last_completed'
 
 
 class CalendarEvent:
@@ -124,21 +127,22 @@ class CalendarEvent:
             last_occurrence = last_occurrence.astimezone(start.tzinfo)
         return last_occurrence.date() if is_allday(start) else last_occurrence
     
-    def _find_next_occurrence(self, rrule_instances):
+    def _find_next_occurrence(self, rrule_instances, last_completed):
         non_cancelled_exception_starts = (
             x._get_start() for x in self.exceptions.values() if not x._get_is_cancelled()
         )
         future_exception_starts = (
             start
             for start in non_cancelled_exception_starts
-            if start >= now_as(start)
+            if start > datetime_as(last_completed, start)
         )
         first_exception_start = min(future_exception_starts, default=None)
         exception_original_starts = {
             x._get_original_start()
             for x in self.exceptions.values()
         }
-        for next_regular_occurrence in rrule_instances.xafter(now_as(self._get_start()), inc=True):
+        last_completed = datetime_as(last_completed, self._get_start())
+        for next_regular_occurrence in rrule_instances.xafter(last_completed):
             if (
                 first_exception_start is not None and
                 first_exception_start < next_regular_occurrence
@@ -151,10 +155,16 @@ class CalendarEvent:
     def next_occurrence(self):
         instances = self._get_rrule()
         start = self._get_start()
+        last_completed = self.get_private_info(CALENDAR_LAST_COMPLETED)
+        last_completed = (
+            parse(last_completed).astimezone(UTC)
+            if last_completed is not None
+            else datetime.now(UTC)
+        )
         if instances is None:
-            return start if datetime.now(UTC) < ensure_datetime(start).astimezone(UTC) else None
+            return start if last_completed < ensure_datetime(start).astimezone(UTC) else None
 
-        next_occurrence = self._find_next_occurrence(instances)
+        next_occurrence = self._find_next_occurrence(instances, last_completed)
         if next_occurrence is None:
             return None
         if not is_allday(start):
