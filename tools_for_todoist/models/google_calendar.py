@@ -68,6 +68,7 @@ class GoogleCalendar:
 
     def _process_sync(self):
         created_events = []
+        created_events_ids = set()
         cancelled_events = []
         updated_events = []
         updated_events_ids = set()
@@ -87,6 +88,7 @@ class GoogleCalendar:
                 new_event = CalendarEvent.from_raw(self, event)
                 self._events[event['id']] = new_event
                 created_events.append(new_event)
+                created_events_ids.add(event['id'])
             else:
                 event_model = self._events[event['id']]
                 old_event_copy = CalendarEvent.from_raw(self, event_model.raw())
@@ -105,7 +107,10 @@ class GoogleCalendar:
             recurring_event = self._events[recurring_event_id]
             recurring_event.update_exception(event)
             # TODO(daniel): Implement this properly
-            if recurring_event_id not in updated_events_ids:
+            if (
+                recurring_event_id not in updated_events_ids and
+                recurring_event_id not in created_events_ids
+            ):
                 updated_events.append((None, recurring_event))
                 updated_events_ids.add(recurring_event_id)
 

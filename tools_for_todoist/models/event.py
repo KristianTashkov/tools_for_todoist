@@ -141,7 +141,9 @@ class CalendarEvent:
             x._get_original_start()
             for x in self.exceptions.values()
         }
-        last_completed = datetime_as(last_completed, self._get_start())
+
+        if is_allday(self._get_start()):
+            last_completed = ensure_datetime(last_completed.date())
         for next_regular_occurrence in rrule_instances.xafter(last_completed):
             if (
                 first_exception_start is not None and
@@ -162,7 +164,7 @@ class CalendarEvent:
             else datetime.now(UTC)
         )
         if instances is None:
-            return start if last_completed < ensure_datetime(start).astimezone(UTC) else None
+            return start if datetime_as(last_completed, start) < start else None
 
         next_occurrence = self._find_next_occurrence(instances, last_completed)
         if next_occurrence is None:

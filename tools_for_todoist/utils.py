@@ -34,7 +34,12 @@ def ensure_datetime(dt):
 
 def datetime_as(dt, compare_dt):
     dt = ensure_datetime(dt)
-    return dt.date() if is_allday(compare_dt) else dt
+    if is_allday(compare_dt):
+        return dt.date()
+    if compare_dt.tzinfo is not None:
+        return dt.astimezone(UTC)
+    assert dt.tzinfo is None
+    return dt
 
 
 def to_todoist_date(dt):
