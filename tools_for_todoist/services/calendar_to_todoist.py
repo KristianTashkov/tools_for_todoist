@@ -168,10 +168,10 @@ class CalendarToTodoistService:
                         print('ERROR|Link to calendar event missing for', item_id)
                         continue
                     calendar_event = self.item_to_event[item_id]
-                    should_sync |= self._update_todoist_item(item, calendar_event)
                     calendar_event.save_private_info(
                         CALENDAR_LAST_COMPLETED, old_item.next_due_date())
                     calendar_event.save()
+                    should_sync |= self._update_todoist_item(item, calendar_event)
             sync_results.append(sync_result)
         return sync_results
 
