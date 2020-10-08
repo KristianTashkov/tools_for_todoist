@@ -41,4 +41,10 @@ setuptools.setup(
         'recurrent==0.4.0',
         'python-dateutil==2.8.1'
     ],
+    extras_require={
+        'test': [
+            'flake8==3.8.4',
+            'pytest==6.1.0'
+        ],
+    }
 )

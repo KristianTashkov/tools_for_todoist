@@ -127,7 +127,7 @@ class CalendarEvent:
         if not is_allday(start):
             last_occurrence = last_occurrence.astimezone(start.tzinfo)
         return last_occurrence.date() if is_allday(start) else last_occurrence
-    
+
     def _find_next_occurrence(self, rrule_instances, last_completed):
         non_cancelled_exception_starts = (
             x._get_start() for x in self.exceptions.values() if not x._get_is_cancelled()
@@ -224,7 +224,7 @@ class CalendarEvent:
             updated_fields['extendedProperties'] = self._extended_properties
         if updated_fields:
             self.google_calendar.update_event(self._id, updated_fields)
-    
+
     def _get_is_cancelled(self):
         return self._raw['status'] == 'cancelled'
 

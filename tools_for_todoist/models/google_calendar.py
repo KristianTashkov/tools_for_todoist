@@ -142,4 +142,3 @@ class GoogleCalendar:
         sync_result = self._process_sync()
         sync_result['raw_events'] = self._raw_events
         return sync_result
-

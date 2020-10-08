@@ -140,10 +140,9 @@ class Todoist:
                 if x['project_id'] == self.active_project_id or x['project_id'] == 0
             ]
             sync_result = self._update_items(active_project_item_updates)
-        except:
+        except Exception:
             print('Todoist Sync Failed|', result)
             raise
         sync_result['raw'] = result
         sync_result['completed'] = new_completed
         return sync_result
-
