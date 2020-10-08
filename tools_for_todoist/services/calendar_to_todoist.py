@@ -71,14 +71,23 @@ class CalendarToTodoistService:
 
     def _process_new_event(self, calendar_event):
         todoist_id = _todoist_id(calendar_event)
+        todoist_item = None
+
         if todoist_id is not None:
             self.item_to_event[todoist_id] = calendar_event
+            todoist_item = self.todoist.get_item_by_id(todoist_id)
+
+        if (
+            todoist_item is not None and
+            calendar_event.get_private_info(CALENDAR_LAST_COMPLETED) is None
+        ):
+            print(
+                'Linked Event with missing last completion info', calendar_event, todoist_item)
+            calendar_event.save_private_info(
+                CALENDAR_LAST_COMPLETED, datetime.now().astimezone(UTC))
+            calendar_event.save()
 
         if calendar_event.next_occurrence() is None:
-            if todoist_id is None:
-                return None
-
-            todoist_item = self.todoist.get_item_by_id(int(todoist_id))
             if todoist_item is None or todoist_item.is_completed():
                 return
 
@@ -87,18 +96,7 @@ class CalendarToTodoistService:
 
         print('Processing new event|', calendar_event)
         calendar_id = calendar_event.get_private_info(CALENDAR_EVENT_ID)
-        if (
-                todoist_id is not None and
-                self.todoist.get_item_by_id(todoist_id) is not None and
-                calendar_id == calendar_event.id()
-        ):
-            todoist_item = self.todoist.get_item_by_id(todoist_id)
-            if calendar_event.get_private_info(CALENDAR_LAST_COMPLETED) is None:
-                print(
-                    'Linked Event with missing last completion info', calendar_event, todoist_item)
-                calendar_event.save_private_info(
-                    CALENDAR_LAST_COMPLETED, datetime.now().astimezone(UTC))
-                calendar_event.save()
+        if todoist_item is not None and calendar_id == calendar_event.id():
             self._update_todoist_item(todoist_item, calendar_event)
             return None
 
@@ -163,15 +161,22 @@ class CalendarToTodoistService:
             for old_item, item_id in sync_result['completed']:
                 item = self.todoist.get_item_by_id(item_id)
                 print('Completed Item|', item if item is not None else f'Deleted item {item_id}')
-                if item is not None:
-                    if item_id not in self.item_to_event:
-                        print('ERROR|Link to calendar event missing for', item_id)
-                        continue
-                    calendar_event = self.item_to_event[item_id]
-                    calendar_event.save_private_info(
-                        CALENDAR_LAST_COMPLETED, old_item.next_due_date())
-                    calendar_event.save()
-                    should_sync |= self._update_todoist_item(item, calendar_event)
+                if item is None or item.is_completed():
+                    continue
+
+                if item_id not in self.item_to_event:
+                    print('ERROR|Link to calendar event missing for', item_id)
+                    continue
+
+                last_completed_date = old_item.next_due_date()
+                if last_completed_date is None:
+                    continue
+
+                calendar_event = self.item_to_event[item_id]
+                calendar_event.save_private_info(
+                    CALENDAR_LAST_COMPLETED, last_completed_date)
+                calendar_event.save()
+                should_sync |= self._update_todoist_item(item, calendar_event)
             sync_results.append(sync_result)
         return sync_results
 

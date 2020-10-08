@@ -87,6 +87,7 @@ class CalendarEvent:
             self.exceptions[exception['id']].update_from_raw(exception)
 
     def save_private_info(self, key, value):
+        assert value is not None
         value = str(value)
         if self._extended_properties is None:
             self._extended_properties = {}
