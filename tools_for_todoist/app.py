@@ -66,7 +66,7 @@ def save_files_from_env():
 
 
 def main():
-    logger = setup_logger()
+    logger = setup_logger(os.environ.get('LOGGING_LEVEL', logging.DEBUG))
     save_files_from_env()
 
     todoist_project = os.environ.get('TODOIST_PROJECT_NAME')
