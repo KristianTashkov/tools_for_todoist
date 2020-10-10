@@ -18,15 +18,14 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 
 import os
-import json
 import logging
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from tools_for_todoist.credentials import CREDENTIALS_JSON_PATH, TOKEN_CACHE_PATH
 from tools_for_todoist.models.event import CalendarEvent
+from tools_for_todoist.storage import get_storage
 
 logger = logging.getLogger(__name__)
 
@@ -35,32 +34,37 @@ SCOPES = [
     'https://www.googleapis.com/auth/calendar.events'
 ]
 
+GOOGLE_CALENDAR_CREDENTIALS = 'google_calendar.credentials'
+GOOGLE_CALENDAR_TOKEN = 'google_calendar.token'
+GOOGLE_CALENDAR_CALENDAR_ID = 'google_calendar.calendar_id'
+
 
 def _save_credentials(token):
-    with open(TOKEN_CACHE_PATH, 'w') as token_io:
-        token_io.write(token.to_json())
+    get_storage().set_value(GOOGLE_CALENDAR_TOKEN, token.to_json())
 
 
 def _do_auth():
-    if os.path.exists(TOKEN_CACHE_PATH):
-        with open(TOKEN_CACHE_PATH, 'rb') as token_io:
-            token = Credentials.from_authorized_user_info(json.loads(token_io.readline().strip()))
+    storage = get_storage()
+    token_json = storage.get_value(GOOGLE_CALENDAR_TOKEN)
+    if token_json is not None:
+        token = Credentials.from_authorized_user_info(token_json)
         if token.valid:
             return token
         if token.expired and token.refresh_token:
             token.refresh(Request())
             _save_credentials(token)
             return token
-    flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_JSON_PATH, SCOPES)
+    flow = InstalledAppFlow.from_client_config(
+        storage.get_value(GOOGLE_CALENDAR_CREDENTIALS), SCOPES)
     token = flow.run_local_server(port=int(os.environ.get('PORT', 0)))
     _save_credentials(token)
     return token
 
 
 class GoogleCalendar:
-    def __init__(self, calendar_id):
+    def __init__(self):
         token = _do_auth()
-        self._calendar_id = calendar_id
+        self._calendar_id = get_storage().get_value(GOOGLE_CALENDAR_CALENDAR_ID)
         self.api = build('calendar', 'v3', credentials=token)
         self._raw_events = []
         self._events = {}

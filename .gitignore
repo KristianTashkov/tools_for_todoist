@@ -32,6 +32,4 @@ MANIFEST
 .idea
 .vscode
 
-tools_for_todoist/secrets.py
-tools_for_todoist/credentials/*
-!tools_for_todoist/credentials/__init__.py
+tools_for_todoist/storage/store.json

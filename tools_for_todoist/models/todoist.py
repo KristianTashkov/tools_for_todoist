@@ -20,22 +20,24 @@ import logging
 
 from todoist.api import TodoistAPI
 
-from tools_for_todoist.credentials import TODOIST_API_TOKEN_PATH
 from tools_for_todoist.models.item import TodoistItem
+from tools_for_todoist.storage import get_storage
 
 logger = logging.getLogger(__name__)
 
+TODOIST_API_KEY = 'todoist.api_key'
+TODOIST_ACTIVE_PROJECT = 'todoist.active_project'
+
 
 class Todoist:
-    def __init__(self, active_project_name):
-        with open(TODOIST_API_TOKEN_PATH) as file:
-            token = file.readline().strip()
-        self.api = TodoistAPI(token)
+    def __init__(self):
+        storage = get_storage()
+        self.api = TodoistAPI(storage.get_value(TODOIST_API_KEY))
         self.api.reset_state()
         self._items = {}
         self._last_completed = None
         self.active_project_id = -1
-        self._initial_sync(active_project_name)
+        self._initial_sync(storage.get_value(TODOIST_ACTIVE_PROJECT))
 
     def _activity_sync(self, offset=0, limit=100):
         activity_result = self.api.activity.get(

@@ -20,9 +20,6 @@ import logging
 import time
 import os
 
-from tools_for_todoist.credentials import (
-    CREDENTIALS_JSON_PATH, TODOIST_API_TOKEN_PATH, TOKEN_CACHE_PATH
-)
 from tools_for_todoist.services.calendar_to_todoist import CalendarToTodoistService
 
 
@@ -37,8 +34,8 @@ def setup_logger(logging_level=logging.DEBUG):
     return logger
 
 
-def run_sync_service(todoist_project, calendar_id, logger):
-    sync_service = CalendarToTodoistService(calendar_id, todoist_project)
+def run_sync_service(logger):
+    sync_service = CalendarToTodoistService()
 
     while True:
         result = sync_service.sync()
@@ -51,28 +48,9 @@ def run_sync_service(todoist_project, calendar_id, logger):
         time.sleep(10)
 
 
-def save_files_from_env():
-    if not os.path.exists(CREDENTIALS_JSON_PATH):
-        with open(CREDENTIALS_JSON_PATH, 'w') as file:
-            file.write(os.environ.get('GOOGLE_CALENDAR_CREDENTIALS'))
-
-    if not os.path.exists(TODOIST_API_TOKEN_PATH):
-        with open(TODOIST_API_TOKEN_PATH, 'w') as file:
-            file.write(os.environ.get('TODOIST_API_KEY'))
-
-    if not os.path.exists(TOKEN_CACHE_PATH) and 'GOOGLE_CALENDAR_TOKEN' in os.environ:
-        with open(TOKEN_CACHE_PATH, 'w') as file:
-            file.write(os.environ.get('GOOGLE_CALENDAR_TOKEN'))
-
-
 def main():
     logger = setup_logger(os.environ.get('LOGGING_LEVEL', logging.DEBUG))
-    save_files_from_env()
-
-    todoist_project = os.environ.get('TODOIST_PROJECT_NAME')
-    calendar_id = os.environ.get('GOOGLE_CALENDAR_ID')
-
-    run_sync_service(todoist_project, calendar_id, logger)
+    run_sync_service(logger)
 
 
 if __name__ == '__main__':

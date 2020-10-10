@@ -48,9 +48,9 @@ def _todoist_title(calendar_event):
 
 
 class CalendarToTodoistService:
-    def __init__(self, calendar_id, todoist_project):
-        self.todoist = Todoist(todoist_project)
-        self.google_calendar = GoogleCalendar(calendar_id)
+    def __init__(self):
+        self.todoist = Todoist()
+        self.google_calendar = GoogleCalendar()
         self.item_to_event = {}
 
     def _update_todoist_item(self, todoist_item, calendar_event):
