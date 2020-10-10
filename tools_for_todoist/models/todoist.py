@@ -16,10 +16,14 @@ more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
+import logging
+
 from todoist.api import TodoistAPI
 
 from tools_for_todoist.credentials import TODOIST_API_TOKEN_PATH
 from tools_for_todoist.models.item import TodoistItem
+
+logger = logging.getLogger(__name__)
 
 
 class Todoist:
@@ -108,22 +112,22 @@ class Todoist:
         return self._items.get(id)
 
     def add_item(self, item):
-        print('Adding item|', item)
+        logger.info(f'Adding item| {item}')
         item_raw = self.api.items.add(
             item.content, project_id=item.project_id, priority=item.priority, due=item._due)
         self._items[item_raw['id']] = item
         return item_raw.data
 
     def update_item(self, item, **kwargs):
-        print(f'Updating item| {item} kwargs:{kwargs}')
+        logger.info(f'Updating item| {item} kwargs:{kwargs}')
         self.api.items.update(item.id, **kwargs)
 
     def delete_item(self, item):
-        print('Deleting item|', item)
+        logger.info(f'Deleting item| {item}')
         self.api.items.delete(item.id)
 
     def archive_item(self, item):
-        print('Archiving item|', item)
+        logger.info(f'Archiving item| {item}')
         self.api.items.complete(item.id, force_history=True)
 
     def sync(self):
@@ -142,8 +146,8 @@ class Todoist:
                 if x['project_id'] == self.active_project_id or x['project_id'] == 0
             ]
             sync_result = self._update_items(active_project_item_updates)
-        except Exception:
-            print('Todoist Sync Failed|', result)
+        except Exception as e:
+            logger.exception('Todoist Sync Failed| {result}', exc_info=e)
             raise
         sync_result['raw'] = result
         sync_result['completed'] = new_completed

@@ -17,6 +17,8 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 import re
+import logging
+
 from datetime import datetime
 from dateutil.tz import UTC
 
@@ -24,6 +26,8 @@ from tools_for_todoist.models.event import CALENDAR_LAST_COMPLETED
 from tools_for_todoist.models.google_calendar import GoogleCalendar
 from tools_for_todoist.models.item import TodoistItem
 from tools_for_todoist.models.todoist import Todoist
+
+logger = logging.getLogger(__name__)
 
 CALENDAR_EVENT_TODOIST_KEY = 'todoist_item_id'
 CALENDAR_EVENT_ID = 'calendar_event_id'
@@ -81,8 +85,8 @@ class CalendarToTodoistService:
             todoist_item is not None and
             calendar_event.get_private_info(CALENDAR_LAST_COMPLETED) is None
         ):
-            print(
-                'Linked Event with missing last completion info', calendar_event, todoist_item)
+            logger.warning(
+                f'Linked Event with missing last completion info {calendar_event} {todoist_item}')
             calendar_event.save_private_info(
                 CALENDAR_LAST_COMPLETED, datetime.now().astimezone(UTC))
             calendar_event.save()
@@ -94,7 +98,7 @@ class CalendarToTodoistService:
             self.todoist.archive_item(todoist_item)
             return None
 
-        print('Processing new event|', calendar_event)
+        logger.info(f'Processing new event| {calendar_event}')
         calendar_id = calendar_event.get_private_info(CALENDAR_EVENT_ID)
         if todoist_item is not None and calendar_id == calendar_event.id():
             self._update_todoist_item(todoist_item, calendar_event)
@@ -104,7 +108,7 @@ class CalendarToTodoistService:
         return calendar_event, item
 
     def _process_cancelled_event(self, calendar_event):
-        print('Canceling event|', calendar_event)
+        logger.info(f'Canceling event| {calendar_event}')
         todoist_id = _todoist_id(calendar_event)
 
         if todoist_id is not None:
@@ -124,7 +128,7 @@ class CalendarToTodoistService:
                 self.todoist.archive_item(todoist_item)
             return None
 
-        print('Updating event|', old_calendar_event, calendar_event)
+        logger.info(f'Updating event| old:{old_calendar_event} new:{calendar_event}')
         if todoist_item is not None:
             self._update_todoist_item(todoist_item, calendar_event)
             return None
@@ -160,12 +164,13 @@ class CalendarToTodoistService:
 
             for old_item, item_id in sync_result['completed']:
                 item = self.todoist.get_item_by_id(item_id)
-                print('Completed Item|', item if item is not None else f'Deleted item {item_id}')
+                item_info = item if item is not None else f'Deleted item {item_id}'
+                logger.info(f'Completed Item| {item_info}')
                 if item is None or item.is_completed():
                     continue
 
                 if item_id not in self.item_to_event:
-                    print('ERROR|Link to calendar event missing for', item_id)
+                    logger.warning(f'Link to calendar event missing for {item_id}')
                     continue
 
                 last_completed_date = old_item.next_due_date()

@@ -17,9 +17,9 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 
-
 import os
 import json
+import logging
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -27,6 +27,8 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from tools_for_todoist.credentials import CREDENTIALS_JSON_PATH, TOKEN_CACHE_PATH
 from tools_for_todoist.models.event import CalendarEvent
+
+logger = logging.getLogger(__name__)
 
 SCOPES = [
     'https://www.googleapis.com/auth/calendar.readonly',
@@ -101,8 +103,7 @@ class GoogleCalendar:
             if recurring_event_id in cancelled_events_ids:
                 continue
             if recurring_event_id not in self._events:
-                print(
-                    "Skipping recurring event exception for missing event: ", event)
+                logger.warning(f'Skipping recurring event exception for missing event: {event}')
                 continue
             recurring_event = self._events[recurring_event_id]
             recurring_event.update_exception(event)
