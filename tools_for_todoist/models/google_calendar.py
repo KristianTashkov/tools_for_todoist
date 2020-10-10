@@ -19,6 +19,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import os
 import logging
+import json
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -40,7 +41,7 @@ GOOGLE_CALENDAR_CALENDAR_ID = 'google_calendar.calendar_id'
 
 
 def _save_credentials(token):
-    get_storage().set_value(GOOGLE_CALENDAR_TOKEN, token.to_json())
+    get_storage().set_value(GOOGLE_CALENDAR_TOKEN, json.loads(token.to_json()))
 
 
 def _do_auth():
