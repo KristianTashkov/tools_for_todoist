@@ -34,9 +34,11 @@ class Todoist:
         self._initial_sync(active_project_name)
 
     def _activity_sync(self, offset=0, limit=100):
-        return self.api.activity.get(
+        activity_result = self.api.activity.get(
             object_type='item', event_type='completed', parent_project_id=self.active_project_id,
             offset=offset, limit=limit)
+        assert 'count' in activity_result and 'events' in activity_result, str(activity_result)
+        return activity_result
 
     def _initial_sync(self, active_project_name):
         self._initial_result = self.api.sync()
