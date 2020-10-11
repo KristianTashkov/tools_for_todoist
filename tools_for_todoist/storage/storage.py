@@ -22,117 +22,91 @@ import json
 import logging
 import os
 
-from abc import ABCMeta, abstractmethod
-
 logger = logging.getLogger(__name__)
 
 
-class KeyValueStorage(metaclass=ABCMeta):
-    @abstractmethod
-    def get_value(self, key):
-        pass
-
-    @abstractmethod
-    def set_value(self, key, value):
-        pass
-
-    @abstractmethod
-    def close(self):
-        pass
-
-
-class LocalKeyValueStorage(KeyValueStorage):
-    def __init__(self, store_path):
-        self.store_path = store_path
+class KeyValueStorage:
+    def __init__(self):
         self.store = {}
-        if os.path.exists(store_path):
-            with open(store_path, 'r') as file:
-                self.store = json.load(file)
-
-    def _save_file(self):
-        with open(self.store_path, 'w') as file:
-            json.dump(self.store, file, indent=2)
 
     def get_value(self, key):
         return self.store.get(key)
 
     def set_value(self, key, value):
         self.store[key] = value
-        self._save_file()
 
     def unset_key(self, key):
         self.store.pop(key, None)
-        self._save_file()
 
     def close(self):
         pass
 
 
-POSTGRES_SINGLE_VALUE = 'postgres_single_value'
+class LocalKeyValueStorage(KeyValueStorage):
+    def __init__(self, store_path):
+        super().__init__()
+        self.store_path = store_path
+        if os.path.exists(store_path):
+            with open(store_path, 'r') as file:
+                self.store = json.load(file)
+
+    def set_value(self, key, value):
+        super().set_value(key, value)
+        self._save_file()
+
+    def unset_key(self, key):
+        super().unset_key(key)
+        self._save_file()
+
+    def _save_file(self):
+        with open(self.store_path, 'w') as file:
+            json.dump(self.store, file, indent=2)
 
 
 class PostgresKeyValueStorage(KeyValueStorage):
-    def __init__(self, database_config):
-        self.connection = psycopg2.connect(database_config)
+    def __init__(self, database_url):
+        super().__init__()
+        self.connection = psycopg2.connect(database_url)
         initialize_sql = '''
         CREATE TABLE if not exists key_value_store (
             key varchar PRIMARY KEY,
             value json
         )
         '''
-
         self.cursor = self.connection.cursor()
-        try:
-            self.cursor.execute(initialize_sql)
-        except Exception as e:
-            logger.exception('Error while initializing database', e)
-            raise
-        finally:
-            self.connection.commit()
+        self._execute_sql(initialize_sql)
 
-    def get_value(self, key):
+        self._execute_sql('SELECT * from key_value_store')
+        for key, value in self.cursor.fetchall():
+            self.store[key] = value
+
+    def _execute_sql(self, sql, args=None):
         try:
-            select_sql = '''
-                SELECT value from key_value_store
-                WHERE key = %s
-                LIMIT 1
-            '''
-            self.cursor.execute(select_sql, (key, ))
-            value = self.cursor.fetchone()
-            return value[0] if value is not None else None
+            self.cursor.execute(sql, args if args is not None else ())
         except Exception as e:
-            logger.exception(f'Error while getting {key}', e)
+            logger.exception(f'Error while executing: "{sql}" with args: {args}', e)
             raise
         finally:
             self.connection.commit()
 
     def set_value(self, key, value):
-        try:
-            insert_sql = '''
-                INSERT INTO key_value_store (key, value)
-                VALUES (%s, %s)
-                ON CONFLICT (key) DO UPDATE SET
-                value = EXCLUDED.value;
-            '''
-            self.cursor.execute(insert_sql, (key, json.dumps(value)))
-        except Exception as e:
-            logger.exception(f'Error while saving {key} as {value}', e)
-            raise
-        finally:
-            self.connection.commit()
+        super().set_value(key, value)
+        self.store[key] = value
+        insert_sql = '''
+            INSERT INTO key_value_store (key, value)
+            VALUES (%s, %s)
+            ON CONFLICT (key) DO UPDATE SET
+            value = EXCLUDED.value;
+        '''
+        self._execute_sql(insert_sql, (key, json.dumps(value)))
 
-    def unset_value(self, key):
-        try:
-            delete_sql = '''
-                DELETE FROM key_value_store
-                WHERE key = %s
-            '''
-            self.cursor.execute(delete_sql, (key,))
-        except Exception as e:
-            logger.exception(f'Error while deleting {key}', e)
-            raise
-        finally:
-            self.connection.commit()
+    def unset_key(self, key):
+        super().unset_key(key)
+        delete_sql = '''
+            DELETE FROM key_value_store
+            WHERE key = %s
+        '''
+        self._execute_sql(delete_sql, (key,))
 
     def close(self):
         self.cursor.close()
