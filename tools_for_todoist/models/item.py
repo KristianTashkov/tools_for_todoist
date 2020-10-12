@@ -99,6 +99,9 @@ class TodoistItem:
             return False
         return self._raw.get('in_history', False)
 
+    def has_parent(self):
+        return self._raw.get('parent_id') is not None
+
     def save(self):
         if self.id == -1:
             self._raw = self.todoist.add_item(self)

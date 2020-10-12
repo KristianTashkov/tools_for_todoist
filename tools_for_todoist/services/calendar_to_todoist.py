@@ -165,8 +165,9 @@ class CalendarToTodoistService:
             for old_item, item_id in sync_result['completed']:
                 item = self.todoist.get_item_by_id(item_id)
                 item_info = item if item is not None else f'Deleted item {item_id}'
+
                 logger.info(f'Completed Item| {item_info}')
-                if item is None or item.is_completed():
+                if item is None or item.has_parent():
                     continue
 
                 if item_id not in self.item_to_event:
@@ -181,7 +182,9 @@ class CalendarToTodoistService:
                 calendar_event.save_private_info(
                     CALENDAR_LAST_COMPLETED, last_completed_date)
                 calendar_event.save()
-                should_sync |= self._update_todoist_item(item, calendar_event)
+
+                if not item.is_completed():
+                    should_sync |= self._update_todoist_item(item, calendar_event)
             sync_results.append(sync_result)
         return sync_results
 
