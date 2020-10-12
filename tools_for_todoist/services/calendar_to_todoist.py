@@ -166,7 +166,7 @@ class CalendarToTodoistService:
                 item = self.todoist.get_item_by_id(item_id)
                 item_info = item if item is not None else f'Deleted item {item_id}'
 
-                logger.info(f'Completed Item| {item_info}')
+                logger.info(f'Completed Item| {old_item} {item_info}')
                 if item is None or item.has_parent():
                     continue
 
