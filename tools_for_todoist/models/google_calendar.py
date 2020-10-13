@@ -112,7 +112,10 @@ class GoogleCalendar:
             if recurring_event_id in cancelled_events_ids:
                 continue
             if recurring_event_id not in self._events:
-                logger.warning(f'Skipping recurring event exception for missing event: {event}')
+                logger.warning(
+                    f'Skipping recurring event exception for missing event: '
+                    f'{event.get("summary")} {event.get("status")} {event.get("originalStartTime")}'
+                )
                 continue
             recurring_event = self._events[recurring_event_id]
             recurring_event.update_exception(event)
@@ -139,9 +142,8 @@ class GoogleCalendar:
             calendarId=self._calendar_id, eventId=event_id, body=update_data).execute()
 
     def sync(self):
-        extra_params = {}
         request = self.api.events().list(
-            calendarId=self._calendar_id, syncToken=self.sync_token, **extra_params)
+            calendarId=self._calendar_id, syncToken=self.sync_token)
         response = None
 
         self._raw_events = []

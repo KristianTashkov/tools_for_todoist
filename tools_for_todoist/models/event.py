@@ -191,23 +191,29 @@ class CalendarEvent:
         if match is not None:
             until_date = parse(match.groups()[0])
 
-            formatted = f'{formatted[:match.span()[0]]}'\
-                        f' {start_time} until {until_date.date().isoformat()}'\
-                        f'{formatted[match.span()[1]:]}'
+            formatted = (
+                f'{formatted[:match.span()[0]]}'
+                f' {start_time} until {until_date.date().isoformat()}'
+                f'{formatted[match.span()[1]:]}'
+            )
             start_time = None
         match = re.search(r'(.*) of every month', formatted)
         if match is not None:
-            formatted = f'{formatted[:match.span()[0]]}'\
-                        f'every {match.groups()[0]}'\
-                        f'{formatted[match.span()[1]:]}'
+            formatted = (
+                f'{formatted[:match.span()[0]]}'
+                f'every {match.groups()[0]}'
+                f'{formatted[match.span()[1]:]}'
+            )
         formatted = re.sub(r'week on ', '', formatted)
         match = re.search(r'for ([\d]*) times|twice', formatted)
         if match:
             last_instance = self._last_occurrence()
             last_instance = f'{last_instance.year}-{last_instance.month}-{last_instance.day}'
-            formatted = f'{formatted[:match.span()[0]]}' \
-                        f'{start_time} until {last_instance}' \
-                        f'{formatted[match.span()[1]:]}'
+            formatted = (
+                f'{formatted[:match.span()[0]]}'
+                f'{start_time} until {last_instance}'
+                f'{formatted[match.span()[1]:]}'
+            )
             start_time = None
         if start_time is not None:
             formatted += f' {start_time}'
