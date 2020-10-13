@@ -66,7 +66,7 @@ def retry_flaky_function(func, name, on_failure_func=None):
             if on_failure_func is not None:
                 on_failure_func()
             if attempt == 5:
-                logger.exception(f'Failed to execute flaky function {name}', e)
+                logger.exception(f'Failed to execute flaky function {name}', exc_info=e)
                 raise
             plural_failure = 's' if attempt > 1 else ''
             logger.warning(

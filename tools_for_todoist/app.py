@@ -25,6 +25,7 @@ from tools_for_todoist.services.calendar_to_todoist import CalendarToTodoistServ
 
 def setup_logger(logging_level=logging.DEBUG):
     logger = logging.getLogger('tools_for_todoist')
+    logger.handlers.clear()
     logger.setLevel(logging_level)
     stream_handler = logging.StreamHandler()
     stream_handler.setLevel(logging_level)

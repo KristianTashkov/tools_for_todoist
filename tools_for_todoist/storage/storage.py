@@ -85,7 +85,7 @@ class PostgresKeyValueStorage(KeyValueStorage):
         try:
             self.cursor.execute(sql, args if args is not None else ())
         except Exception as e:
-            logger.exception(f'Error while executing: "{sql}" with args: {args}', e)
+            logger.exception(f'Error while executing: "{sql}" with args: {args}', exc_info=e)
             raise
         finally:
             self.connection.commit()

@@ -55,7 +55,9 @@ class Todoist:
         activity_result = retry_flaky_function(
             activity_get_func, 'todoist_activity_get', self._recreate_api
         )
-        assert 'count' in activity_result and 'events' in activity_result, str(activity_result)
+        if 'count' not in activity_result or 'events' not in activity_result:
+            logger.exception(f'Activity result doesn\'t contain expected values: {activity_result}')
+            raise ValueError()
         return activity_result
 
     def _initial_sync(self, active_project_name):
