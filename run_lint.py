@@ -5,7 +5,9 @@ import sys
 
 
 def main():
-    os.chdir(os.path.dirname(__file__))
+    base_dir = os.path.dirname(__file__)
+    if base_dir:
+        os.chdir(base_dir)
     parser = argparse.ArgumentParser(description="Run linters and formatters.")
     parser.add_argument("--check", action="store_true", help="Only run formatters in check mode")
     args = parser.parse_args()
