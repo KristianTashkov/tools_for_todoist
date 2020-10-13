@@ -98,7 +98,7 @@ class CalendarToTodoistService:
             self.todoist.archive_item(todoist_item)
             return None
 
-        logger.info(f'Processing new event| {calendar_event}')
+        logger.debug(f'Processing new event| {calendar_event}')
         calendar_id = calendar_event.get_private_info(CALENDAR_EVENT_ID)
         if todoist_item is not None and calendar_id == calendar_event.id():
             self._update_todoist_item(todoist_item, calendar_event)
@@ -108,7 +108,7 @@ class CalendarToTodoistService:
         return calendar_event, item
 
     def _process_cancelled_event(self, calendar_event):
-        logger.info(f'Canceling event| {calendar_event}')
+        logger.debug(f'Canceling event| {calendar_event}')
         todoist_id = _todoist_id(calendar_event)
 
         if todoist_id is not None:
@@ -128,7 +128,7 @@ class CalendarToTodoistService:
                 self.todoist.archive_item(todoist_item)
             return None
 
-        logger.info(f'Updating event| old:{old_calendar_event} new:{calendar_event}')
+        logger.debug(f'Updating event| old:{old_calendar_event} new:{calendar_event}')
         if todoist_item is not None:
             self._update_todoist_item(todoist_item, calendar_event)
             return None

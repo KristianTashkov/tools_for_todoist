@@ -50,7 +50,13 @@ def run_sync_service(logger):
 
 def main():
     logger = setup_logger(os.environ.get('LOGGING_LEVEL', logging.DEBUG))
-    run_sync_service(logger)
+    while True:
+        try:
+            run_sync_service(logger)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as e:
+            logging.exception('Restarting app after exception: ', e)
 
 
 if __name__ == '__main__':
