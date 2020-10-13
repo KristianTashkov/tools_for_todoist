@@ -34,7 +34,7 @@ jobs:
         pip install -e .[test]
     - name: Lint
       run: |
-        ./run_lint.sh
+        python run_lint.py --check
     - name: Pytest
       run: |
         pytest
