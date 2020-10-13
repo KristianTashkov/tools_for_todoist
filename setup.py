@@ -41,7 +41,6 @@ setuptools.setup(
         'recurrent==0.4.0',
         'python-dateutil==2.8.1',
         'psycopg2==2.8.6',
-        "typing; python_version < '3.5'"
     ],
     extras_require={'test': ['flake8==3.8.4', 'pytest==6.1.0', 'isort==5.6.4', 'black==20.8b1']},
 )
