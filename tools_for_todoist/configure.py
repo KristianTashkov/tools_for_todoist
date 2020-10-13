@@ -21,11 +21,18 @@ import json
 import subprocess
 
 from tools_for_todoist.models.google_calendar import (
-    GOOGLE_CALENDAR_TOKEN, GOOGLE_CALENDAR_CREDENTIALS, GOOGLE_CALENDAR_CALENDAR_ID, GoogleCalendar)
-from tools_for_todoist.models.todoist import (
-    TODOIST_API_KEY, TODOIST_ACTIVE_PROJECT, Todoist)
+    GOOGLE_CALENDAR_CALENDAR_ID,
+    GOOGLE_CALENDAR_CREDENTIALS,
+    GOOGLE_CALENDAR_TOKEN,
+    GoogleCalendar,
+)
+from tools_for_todoist.models.todoist import TODOIST_ACTIVE_PROJECT, TODOIST_API_KEY, Todoist
 from tools_for_todoist.storage import (
-    get_storage, PostgresKeyValueStorage, LocalKeyValueStorage, DEFAULT_STORAGE)
+    DEFAULT_STORAGE,
+    LocalKeyValueStorage,
+    PostgresKeyValueStorage,
+    get_storage,
+)
 
 
 def _get_heroku_postgres_link():
@@ -37,12 +44,21 @@ def _get_heroku_postgres_link():
 
 
 parser = argparse.ArgumentParser(description='Configure the application.')
-parser.add_argument('--copy_local', action='store_true',
-                    help='Copy local store to remote postgres store')
-parser.add_argument('--local_file_store', type=str, default=DEFAULT_STORAGE,
-                    help='Local filepath to local key value storage')
-parser.add_argument('--database_url', type=str, default=_get_heroku_postgres_link(),
-                    help='Postgres url to remote database to copy local data to')
+parser.add_argument(
+    '--copy_local', action='store_true', help='Copy local store to remote postgres store'
+)
+parser.add_argument(
+    '--local_file_store',
+    type=str,
+    default=DEFAULT_STORAGE,
+    help='Local filepath to local key value storage',
+)
+parser.add_argument(
+    '--database_url',
+    type=str,
+    default=_get_heroku_postgres_link(),
+    help='Postgres url to remote database to copy local data to',
+)
 
 
 def manual_flow():

@@ -21,10 +21,7 @@ from tools_for_todoist.models.event import CalendarEvent
 
 
 def test_event_from_raw():
-    raw_data = {
-        'id': 'id',
-        'summary': 'Title'
-    }
+    raw_data = {'id': 'id', 'summary': 'Title'}
     event = CalendarEvent.from_raw(None, raw_data)
     assert event.summary == 'Title'
     assert event.id() == 'id'

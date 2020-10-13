@@ -45,19 +45,25 @@ class Todoist:
     def _activity_sync(self, offset=0, limit=100):
         def activity_get_func():
             return self.api.activity.get(
-                object_type='item', event_type='completed',
-                parent_project_id=self.active_project_id, offset=offset, limit=limit)
+                object_type='item',
+                event_type='completed',
+                parent_project_id=self.active_project_id,
+                offset=offset,
+                limit=limit,
+            )
+
         activity_result = retry_flaky_function(
-            activity_get_func, 'todoist_activity_get', self._recreate_api)
+            activity_get_func, 'todoist_activity_get', self._recreate_api
+        )
         assert 'count' in activity_result and 'events' in activity_result, str(activity_result)
         return activity_result
 
     def _initial_sync(self, active_project_name):
         self._initial_result = retry_flaky_function(
-            lambda: self.api.sync(), 'todoist_initial_sync', self._recreate_api)
+            lambda: self.api.sync(), 'todoist_initial_sync', self._recreate_api
+        )
         self.active_project_id = [
-            x for x in self._initial_result['projects']
-            if x['name'] == active_project_name
+            x for x in self._initial_result['projects'] if x['name'] == active_project_name
         ][0]['id']
         for item in self._initial_result['items']:
             if item['project_id'] != self.active_project_id:
@@ -111,11 +117,7 @@ class Todoist:
                 item_model = self.get_item_by_id(item['id'])
                 item_model.update_from_raw(item)
                 updated_items.append((old_item, item_model))
-        return {
-            'deleted': deleted_items,
-            'created': new_items,
-            'updated': updated_items,
-        }
+        return {'deleted': deleted_items, 'created': new_items, 'updated': updated_items}
 
     def get_item_by_id(self, id):
         return self._items.get(id)
@@ -123,7 +125,8 @@ class Todoist:
     def add_item(self, item):
         logger.info(f'Adding item| {item}')
         item_raw = self.api.items.add(
-            item.content, project_id=item.project_id, priority=item.priority, due=item._due)
+            item.content, project_id=item.project_id, priority=item.priority, due=item._due
+        )
         self._items[item_raw['id']] = item
         return item_raw.data
 
@@ -153,7 +156,8 @@ class Todoist:
                 item.id = new_id
                 self._items[new_id] = item
             active_project_item_updates = [
-                x for x in result['items']
+                x
+                for x in result['items']
                 if x['project_id'] == self.active_project_id or x['project_id'] == 0
             ]
             sync_result = self._update_items(active_project_item_updates)
