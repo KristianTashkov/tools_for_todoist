@@ -27,6 +27,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from tools_for_todoist.models.event import CalendarEvent
 from tools_for_todoist.storage import get_storage
+from tools_for_todoist.utils import retry_flaky_function
 
 logger = logging.getLogger(__name__)
 
@@ -64,14 +65,17 @@ def _do_auth():
 
 class GoogleCalendar:
     def __init__(self):
-        token = _do_auth()
+        self._recreate_api()
         self._calendar_id = get_storage().get_value(GOOGLE_CALENDAR_CALENDAR_ID)
-        self.api = build('calendar', 'v3', credentials=token)
         self._raw_events = []
         self._events = {}
         self.sync_token = None
         self.default_timezone = self.api.calendars().get(
             calendarId=self._calendar_id).execute()['timeZone']
+
+    def _recreate_api(self):
+        token = _do_auth()
+        self.api = build('calendar', 'v3', credentials=token)
 
     def _process_sync(self):
         created_events = []
@@ -138,10 +142,13 @@ class GoogleCalendar:
         extra_params = {}
         request = self.api.events().list(
             calendarId=self._calendar_id, syncToken=self.sync_token, **extra_params)
+        response = None
 
         self._raw_events = []
         while request is not None:
-            response = request.execute()
+            response = retry_flaky_function(
+                lambda: request.execute(), 'google_calendar_sync',
+                on_failure_func=self._recreate_api)
             self._raw_events.extend(response['items'])
             request = self.api.events().list_next(request, response)
         self.sync_token = response['nextSyncToken']

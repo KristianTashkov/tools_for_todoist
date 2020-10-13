@@ -22,6 +22,7 @@ from todoist.api import TodoistAPI
 
 from tools_for_todoist.models.item import TodoistItem
 from tools_for_todoist.storage import get_storage
+from tools_for_todoist.utils import retry_flaky_function
 
 logger = logging.getLogger(__name__)
 
@@ -31,23 +32,29 @@ TODOIST_ACTIVE_PROJECT = 'todoist.active_project'
 
 class Todoist:
     def __init__(self):
-        storage = get_storage()
-        self.api = TodoistAPI(storage.get_value(TODOIST_API_KEY))
+        self._recreate_api()
         self.api.reset_state()
         self._items = {}
         self._last_completed = None
         self.active_project_id = -1
-        self._initial_sync(storage.get_value(TODOIST_ACTIVE_PROJECT))
+        self._initial_sync(get_storage().get_value(TODOIST_ACTIVE_PROJECT))
+
+    def _recreate_api(self):
+        self.api = TodoistAPI(get_storage().get_value(TODOIST_API_KEY))
 
     def _activity_sync(self, offset=0, limit=100):
-        activity_result = self.api.activity.get(
-            object_type='item', event_type='completed', parent_project_id=self.active_project_id,
-            offset=offset, limit=limit)
+        def activity_get_func():
+            return self.api.activity.get(
+                object_type='item', event_type='completed',
+                parent_project_id=self.active_project_id, offset=offset, limit=limit)
+        activity_result = retry_flaky_function(
+            activity_get_func, 'todoist_activity_get', self._recreate_api)
         assert 'count' in activity_result and 'events' in activity_result, str(activity_result)
         return activity_result
 
     def _initial_sync(self, active_project_name):
-        self._initial_result = self.api.sync()
+        self._initial_result = retry_flaky_function(
+            lambda: self.api.sync(), 'todoist_initial_sync', self._recreate_api())
         self.active_project_id = [
             x for x in self._initial_result['projects']
             if x['name'] == active_project_name
@@ -133,11 +140,13 @@ class Todoist:
         self.api.items.complete(item.id, force_history=True)
 
     def sync(self):
+        def api_sync():
+            if len(self.api.queue) > 0:
+                return self.api.commit()
+            return self.api.sync()
+
         new_completed = self._new_completed()
-        if len(self.api.queue) > 0:
-            result = self.api.commit()
-        else:
-            result = self.api.sync()
+        result = retry_flaky_function(api_sync, 'todoist_api_sync', self._recreate_api)
         try:
             for temporary_key, new_id in result.get('temp_id_mapping', {}).items():
                 item = self._items.pop(temporary_key)

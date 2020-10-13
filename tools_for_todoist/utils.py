@@ -17,9 +17,13 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 import re
+import logging
+from time import sleep
 
 from dateutil.tz import UTC
 from datetime import date as dt_date, datetime as dt_datetime
+
+logger = logging.getLogger(__name__)
 
 
 def is_allday(dt):
@@ -51,3 +55,17 @@ def to_todoist_date(dt):
 
     timezone = re.search(r'.*/(.*/.*)', dt.tzinfo._filename).groups()[0]
     return dt.astimezone(UTC).isoformat().replace('+00:00', 'Z'), timezone
+
+
+def retry_flaky_function(func, name, on_failure_func=None):
+    for attempt in range(1, 6):
+        try:
+            return func()
+        except Exception as e:
+            if on_failure_func is not None:
+                on_failure_func()
+            if attempt == 5:
+                logger.exception(f'Failed to execute flaky function {name}', e)
+                raise
+            logger.warning(f'Retrying flaky function {name} soon. {attempt} failure so far.')
+            sleep(10 * attempt)
