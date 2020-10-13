@@ -32,8 +32,6 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e .[test]
-        pip uninstall -y typing
-        pip uninstall -y typing-extensions
     - name: Lint
       run: |
         ./run_lint.sh
