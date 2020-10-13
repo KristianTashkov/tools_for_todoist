@@ -54,7 +54,7 @@ class Todoist:
 
     def _initial_sync(self, active_project_name):
         self._initial_result = retry_flaky_function(
-            lambda: self.api.sync(), 'todoist_initial_sync', self._recreate_api())
+            lambda: self.api.sync(), 'todoist_initial_sync', self._recreate_api)
         self.active_project_id = [
             x for x in self._initial_result['projects']
             if x['name'] == active_project_name

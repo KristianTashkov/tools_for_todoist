@@ -42,4 +42,5 @@ def reinitialize_storage():
     global _storage
     if _storage is not None:
         _storage.close()
+        _storage = None
     return get_storage()
