@@ -18,16 +18,14 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 import copy
 import re
-
-
-from recurrent import format
 from datetime import datetime
-from dateutil.rrule import rrulestr
+
 from dateutil.parser import parse
+from dateutil.rrule import rrulestr
 from dateutil.tz import UTC, gettz
+from recurrent import format
 
-from tools_for_todoist.utils import ensure_datetime, is_allday, datetime_as
-
+from tools_for_todoist.utils import datetime_as, ensure_datetime, is_allday
 
 CALENDAR_LAST_COMPLETED = 'last_completed'
 
@@ -138,17 +136,14 @@ class CalendarEvent:
             if start > datetime_as(last_completed, start)
         )
         first_exception_start = min(future_exception_starts, default=None)
-        exception_original_starts = {
-            x._get_original_start()
-            for x in self.exceptions.values()
-        }
+        exception_original_starts = {x._get_original_start() for x in self.exceptions.values()}
 
         if is_allday(self._get_start()):
             last_completed = ensure_datetime(last_completed.date())
         for next_regular_occurrence in rrule_instances.xafter(last_completed):
             if (
-                first_exception_start is not None and
-                first_exception_start < next_regular_occurrence
+                first_exception_start is not None
+                and first_exception_start < next_regular_occurrence
             ):
                 return first_exception_start
             if next_regular_occurrence not in exception_original_starts:

@@ -18,7 +18,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 import os
 
-from tools_for_todoist.storage.storage import PostgresKeyValueStorage, LocalKeyValueStorage
+from tools_for_todoist.storage.storage import LocalKeyValueStorage, PostgresKeyValueStorage
 
 DEFAULT_STORAGE = os.path.join(os.path.dirname(__file__), 'store.json')
 _storage = None

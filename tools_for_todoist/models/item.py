@@ -18,8 +18,8 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 import copy
 
-from dateutil.tz import gettz
 from dateutil.parser import parse
+from dateutil.tz import gettz
 
 from tools_for_todoist.utils import to_todoist_date
 
@@ -76,15 +76,14 @@ class TodoistItem:
             return
 
         next_date, next_timezone = to_todoist_date(next_date) if next_date else (None, None)
-        same_recurrence = (
-                (self._due or {}).get('string') == due_string or
-                (not self.is_recurring() and due_string is None)
+        same_recurrence = (self._due or {}).get('string') == due_string or (
+            not self.is_recurring() and due_string is None
         )
         if (
-            self._due is not None and
-            self._due.get('date') == next_date and
-            self._due.get('timezone') == next_timezone and
-            same_recurrence
+            self._due is not None
+            and self._due.get('date') == next_date
+            and self._due.get('timezone') == next_timezone
+            and same_recurrence
         ):
             return
 
@@ -122,5 +121,7 @@ class TodoistItem:
 
     def __repr__(self):
         completed_string = 'X' if self.is_completed() else 'O'
-        return (f'{completed_string} {self.id}: content:{self.content}, '
-                f'due: {self.next_due_date()}, string: {self.get_due_string()}')
+        return (
+            f'{completed_string} {self.id}: content:{self.content}, '
+            f'due: {self.next_due_date()}, string: {self.get_due_string()}'
+        )

@@ -17,14 +17,15 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 
-import os
-import logging
 import json
+import logging
+import os
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+
 from tools_for_todoist.models.event import CalendarEvent
 from tools_for_todoist.storage import get_storage
 from tools_for_todoist.utils import retry_flaky_function
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 SCOPES = [
     'https://www.googleapis.com/auth/calendar.readonly',
-    'https://www.googleapis.com/auth/calendar.events'
+    'https://www.googleapis.com/auth/calendar.events',
 ]
 
 GOOGLE_CALENDAR_CREDENTIALS = 'google_calendar.credentials'
@@ -57,7 +58,8 @@ def _do_auth():
             _save_credentials(token)
             return token
     flow = InstalledAppFlow.from_client_config(
-        storage.get_value(GOOGLE_CALENDAR_CREDENTIALS), SCOPES)
+        storage.get_value(GOOGLE_CALENDAR_CREDENTIALS), SCOPES
+    )
     token = flow.run_local_server(port=int(os.environ.get('PORT', 0)))
     _save_credentials(token)
     return token
@@ -70,8 +72,9 @@ class GoogleCalendar:
         self._raw_events = []
         self._events = {}
         self.sync_token = None
-        self.default_timezone = self.api.calendars().get(
-            calendarId=self._calendar_id).execute()['timeZone']
+        self.default_timezone = (
+            self.api.calendars().get(calendarId=self._calendar_id).execute()['timeZone']
+        )
 
     def _recreate_api(self):
         token = _do_auth()
@@ -121,8 +124,8 @@ class GoogleCalendar:
             recurring_event.update_exception(event)
             # TODO(daniel): Implement this properly
             if (
-                recurring_event_id not in updated_events_ids and
-                recurring_event_id not in created_events_ids
+                recurring_event_id not in updated_events_ids
+                and recurring_event_id not in created_events_ids
             ):
                 updated_events.append((None, recurring_event))
                 updated_events_ids.add(recurring_event_id)
@@ -131,7 +134,7 @@ class GoogleCalendar:
             'created': created_events,
             'cancelled': cancelled_events,
             'updated': updated_events,
-            'exceptions': pending_exceptions
+            'exceptions': pending_exceptions,
         }
 
     def get_event_by_id(self, event_id):
@@ -139,18 +142,20 @@ class GoogleCalendar:
 
     def update_event(self, event_id, update_data):
         self.api.events().patch(
-            calendarId=self._calendar_id, eventId=event_id, body=update_data).execute()
+            calendarId=self._calendar_id, eventId=event_id, body=update_data
+        ).execute()
 
     def sync(self):
-        request = self.api.events().list(
-            calendarId=self._calendar_id, syncToken=self.sync_token)
+        request = self.api.events().list(calendarId=self._calendar_id, syncToken=self.sync_token)
         response = None
 
         self._raw_events = []
         while request is not None:
             response = retry_flaky_function(
-                lambda: request.execute(), 'google_calendar_sync',
-                on_failure_func=self._recreate_api)
+                lambda: request.execute(),
+                'google_calendar_sync',
+                on_failure_func=self._recreate_api,
+            )
             self._raw_events.extend(response['items'])
             request = self.api.events().list_next(request, response)
         self.sync_token = response['nextSyncToken']

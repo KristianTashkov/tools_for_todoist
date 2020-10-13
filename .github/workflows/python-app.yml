@@ -33,9 +33,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e .
         pip install -e .[test]
-    - name: Lint with flake8
+    - name: Lint
       run: |
         ./run_lint.sh
-    - name: Test with pytest
+    - name: Pytest
       run: |
         pytest

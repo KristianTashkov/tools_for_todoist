@@ -1,3 +1,8 @@
-set -e
-flake8 . --count --select=E9,F63,F7,F82 --show-source
-flake8 . --count --max-complexity=10 --max-line-length=100 --exclude .idea
+failures=0
+trap 'failures=$((failures+1))' ERR
+isort . --check-only
+black . --check
+flake8 . --exclude .idea
+if ((failures > 0)); then
+  exit 1
+fi

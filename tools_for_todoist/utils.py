@@ -16,12 +16,13 @@ more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
-import re
 import logging
+import re
+from datetime import date as dt_date
+from datetime import datetime as dt_datetime
 from time import sleep
 
 from dateutil.tz import UTC
-from datetime import date as dt_date, datetime as dt_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -69,5 +70,6 @@ def retry_flaky_function(func, name, on_failure_func=None):
                 raise
             plural_failure = 's' if attempt > 1 else ''
             logger.warning(
-                f'Retrying flaky function {name} soon. {attempt} failure{plural_failure} so far.')
+                f'Retrying flaky function {name} soon. {attempt} failure{plural_failure} so far.'
+            )
             sleep(10 * (attempt - 1))
