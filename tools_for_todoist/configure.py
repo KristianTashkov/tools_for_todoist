@@ -38,8 +38,7 @@ from tools_for_todoist.storage import (
 def _get_heroku_postgres_link():
     try:
         return subprocess.check_output(['heroku', 'config:get', 'DATABASE_URL']).decode().strip()
-    except Exception as e:
-        print(e)
+    except Exception:
         return None
 
 

@@ -57,7 +57,7 @@ def main():
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception as e:
-            logging.exception('Restarting app after exception: ', e)
+            logging.exception('Restarting app after exception!', exc_info=e)
 
 
 if __name__ == '__main__':

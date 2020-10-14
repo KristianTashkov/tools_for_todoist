@@ -61,7 +61,10 @@ def to_todoist_date(dt):
 def retry_flaky_function(func, name, on_failure_func=None):
     for attempt in range(1, 6):
         try:
-            return func()
+            result = func()
+            if result is None:
+                raise ValueError('Flaky function result was None')
+            return result
         except Exception as e:
             if on_failure_func is not None:
                 on_failure_func()
