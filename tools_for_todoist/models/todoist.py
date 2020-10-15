@@ -60,9 +60,6 @@ class Todoist:
         )
 
     def _initial_sync(self, active_project_name):
-        activity_result = self._activity_sync(limit=1)
-        if activity_result['count']:
-            self._last_completed = activity_result['events'][0]['id']
         self._initial_result = retry_flaky_function(
             lambda: self.api.sync(), 'todoist_initial_sync', on_failure_func=self._recreate_api
         )
@@ -75,6 +72,9 @@ class Todoist:
             self._items[item['id']] = TodoistItem.from_raw(self, item)
         for item in self.api.items.get_completed(self.active_project_id, limit=200):
             self._items[item['id']] = TodoistItem.from_raw(self, item)
+        activity_result = self._activity_sync(limit=1)
+        if activity_result['count']:
+            self._last_completed = activity_result['events'][0]['id']
 
     def _new_completed(self):
         finished_processing = False
