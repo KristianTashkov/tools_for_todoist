@@ -78,7 +78,7 @@ class GoogleCalendar:
 
     def _recreate_api(self):
         token = _do_auth()
-        self.api = build('calendar', 'v3', credentials=token)
+        self.api = build('calendar', 'v3', credentials=token, cache_discovery=False)
 
     def _process_sync(self):
         created_events = []

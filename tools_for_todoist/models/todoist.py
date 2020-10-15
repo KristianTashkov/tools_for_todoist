@@ -52,17 +52,19 @@ class Todoist:
                 limit=limit,
             )
 
-        activity_result = retry_flaky_function(
-            activity_get_func, 'todoist_activity_get', self._recreate_api
+        return retry_flaky_function(
+            activity_get_func,
+            'todoist_activity_get',
+            validate_result_func=lambda x: x and 'count' in x and 'events' in x,
+            on_failure_func=self._recreate_api,
         )
-        if 'count' not in activity_result or 'events' not in activity_result:
-            logger.exception(f'Activity result doesn\'t contain expected values: {activity_result}')
-            raise ValueError()
-        return activity_result
 
     def _initial_sync(self, active_project_name):
+        activity_result = self._activity_sync(limit=1)
+        if activity_result['count']:
+            self._last_completed = activity_result['events'][0]['id']
         self._initial_result = retry_flaky_function(
-            lambda: self.api.sync(), 'todoist_initial_sync', self._recreate_api
+            lambda: self.api.sync(), 'todoist_initial_sync', on_failure_func=self._recreate_api
         )
         self.active_project_id = [
             x for x in self._initial_result['projects'] if x['name'] == active_project_name
@@ -73,9 +75,6 @@ class Todoist:
             self._items[item['id']] = TodoistItem.from_raw(self, item)
         for item in self.api.items.get_completed(self.active_project_id, limit=200):
             self._items[item['id']] = TodoistItem.from_raw(self, item)
-        activity_result = self._activity_sync(limit=1)
-        if activity_result['count']:
-            self._last_completed = activity_result['events'][0]['id']
 
     def _new_completed(self):
         finished_processing = False
@@ -151,7 +150,9 @@ class Todoist:
             return self.api.sync()
 
         new_completed = self._new_completed()
-        result = retry_flaky_function(api_sync, 'todoist_api_sync', self._recreate_api)
+        result = retry_flaky_function(
+            api_sync, 'todoist_api_sync', on_failure_func=self._recreate_api
+        )
         try:
             for temporary_key, new_id in result.get('temp_id_mapping', {}).items():
                 item = self._items.pop(temporary_key)

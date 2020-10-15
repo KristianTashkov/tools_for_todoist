@@ -58,12 +58,12 @@ def to_todoist_date(dt):
     return dt.astimezone(UTC).isoformat().replace('+00:00', 'Z'), timezone
 
 
-def retry_flaky_function(func, name, on_failure_func=None):
+def retry_flaky_function(func, name, *, validate_result_func=None, on_failure_func=None):
     for attempt in range(1, 6):
         try:
             result = func()
-            if result is None:
-                raise ValueError('Flaky function result was None')
+            if validate_result_func is not None and not validate_result_func(result):
+                raise ValueError(f'Flaky function result was valid for result: "{result}"')
             return result
         except Exception as e:
             if on_failure_func is not None:
