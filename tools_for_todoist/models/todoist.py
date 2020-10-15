@@ -71,7 +71,7 @@ class Todoist:
             if item['project_id'] != self.active_project_id:
                 continue
             self._items[item['id']] = TodoistItem.from_raw(self, item)
-        for item in self.api.items.get_completed(self.active_project_id):
+        for item in self.api.items.get_completed(self.active_project_id, limit=200):
             self._items[item['id']] = TodoistItem.from_raw(self, item)
         activity_result = self._activity_sync(limit=1)
         if activity_result['count']:

@@ -53,7 +53,7 @@ class TodoistItem:
         self.project_id = self._raw['project_id']
 
     def is_recurring(self):
-        return self._due is not None and self._due['is_recurring']
+        return self._due is not None and self._due.get('is_recurring')
 
     def next_due_date(self):
         if self._due is None or 'date' not in self._due:

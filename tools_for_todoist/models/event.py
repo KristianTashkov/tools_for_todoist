@@ -182,6 +182,7 @@ class CalendarEvent:
             start_time = ''
 
         formatted = format(rrule)
+        formatted = formatted.replace('daily', 'every day')
         match = re.search(r'until (.*)Z', formatted)
         if match is not None:
             until_date = parse(match.groups()[0])
