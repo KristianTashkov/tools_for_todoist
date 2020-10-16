@@ -40,7 +40,7 @@ setuptools.setup(
         'google-auth-oauthlib==0.4.1',
         'recurrent==0.4.0',
         'python-dateutil==2.8.1',
-        'psycopg2==2.8.6',
+        'psycopg2-binary==2.8.6',
     ],
     extras_require={'test': ['flake8==3.8.4', 'pytest==6.1.0', 'isort==5.6.4', 'black==20.8b1']},
     entry_points={
