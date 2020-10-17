@@ -233,7 +233,7 @@ class CalendarEvent:
     def save(self):
         updated_fields = {}
         if self.summary != self._raw.get('summary'):
-            updated_fields['summary'] = self.summary    
+            updated_fields['summary'] = self.summary
         if self._extended_properties != self._raw.get('extendedProperties'):
             updated_fields['extendedProperties'] = self._extended_properties
         if updated_fields:
