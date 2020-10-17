@@ -30,16 +30,6 @@ from tools_for_todoist.utils import datetime_as, ensure_datetime, is_allday
 CALENDAR_LAST_COMPLETED = 'last_completed'
 
 
-def is_declined_by_me(raw_event):
-    if 'attendees' not in raw_event:
-        return False
-    return any(
-        attendee['responseStatus'] == 'declined'
-        for attendee in raw_event['attendees']
-        if attendee.get('self', False)
-    )
-
-
 class CalendarEvent:
     def __init__(self, google_calendar):
         self.google_calendar = google_calendar
@@ -140,7 +130,7 @@ class CalendarEvent:
         non_cancelled_exception_starts = (
             x._get_start()
             for x in self.exceptions.values()
-            if not (x._get_is_cancelled() or x._get_is_declined_by_me())
+            if not (x._get_is_cancelled() or x._is_declined_by_me())
         )
         future_exception_starts = (
             start
@@ -172,6 +162,8 @@ class CalendarEvent:
             else datetime.now(UTC)
         )
         if instances is None:
+            if self._is_declined_by_me():
+                return None
             return start if datetime_as(last_completed, start) < start else None
 
         next_occurrence = self._find_next_occurrence(instances, last_completed)
@@ -242,8 +234,14 @@ class CalendarEvent:
     def _get_is_cancelled(self):
         return self._raw['status'] == 'cancelled'
 
-    def _get_is_declined_by_me(self):
-        return is_declined_by_me(self._raw)
+    def _is_declined_by_me(self):
+        if 'attendees' not in self._raw:
+            return False
+        return any(
+            attendee['responseStatus'] == 'declined'
+            for attendee in self._raw['attendees']
+            if attendee.get('self', False)
+        )
 
     def __repr__(self):
         if self._get_is_cancelled():
