@@ -29,6 +29,14 @@ from tools_for_todoist.utils import datetime_as, ensure_datetime, is_allday
 
 CALENDAR_LAST_COMPLETED = 'last_completed'
 
+def is_declined_by_me(raw_event):
+    if 'attendees' not in raw_event:
+        return False
+    return any(
+        attendee['responseStatus'] == 'declined'
+        for attendee in raw_event['attendees']
+        if attendee.get('self', False)
+    )
 
 class CalendarEvent:
     def __init__(self, google_calendar):

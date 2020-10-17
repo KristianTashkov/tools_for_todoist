@@ -26,7 +26,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-from tools_for_todoist.models.event import CalendarEvent
+from tools_for_todoist.models.event import CalendarEvent, is_declined_by_me
 from tools_for_todoist.storage import get_storage
 from tools_for_todoist.utils import retry_flaky_function
 
@@ -93,7 +93,7 @@ class GoogleCalendar:
             recurring_event_id = event.get('recurringEventId')
             if recurring_event_id is not None:
                 pending_exceptions.append(event)
-            elif event['status'] == 'cancelled':
+            elif event['status'] == 'cancelled' or is_declined_by_me(event):
                 canceled_event = self._events.pop(event['id'], None)
                 if canceled_event is not None:
                     cancelled_events.append(canceled_event)
