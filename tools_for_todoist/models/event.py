@@ -29,6 +29,7 @@ from tools_for_todoist.utils import datetime_as, ensure_datetime, is_allday
 
 CALENDAR_LAST_COMPLETED = 'last_completed'
 
+
 def is_declined_by_me(raw_event):
     if 'attendees' not in raw_event:
         return False
@@ -37,6 +38,7 @@ def is_declined_by_me(raw_event):
         for attendee in raw_event['attendees']
         if attendee.get('self', False)
     )
+
 
 class CalendarEvent:
     def __init__(self, google_calendar):
@@ -136,8 +138,8 @@ class CalendarEvent:
 
     def _find_next_occurrence(self, rrule_instances, last_completed):
         non_cancelled_exception_starts = (
-            x._get_start() 
-            for x in self.exceptions.values() 
+            x._get_start()
+            for x in self.exceptions.values()
             if not (x._get_is_cancelled() or x._get_is_declined_by_me())
         )
         future_exception_starts = (
@@ -239,7 +241,7 @@ class CalendarEvent:
 
     def _get_is_cancelled(self):
         return self._raw['status'] == 'cancelled'
-    
+
     def _get_is_declined_by_me(self):
         return is_declined_by_me(self._raw)
 
