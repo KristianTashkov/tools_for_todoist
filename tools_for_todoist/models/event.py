@@ -233,7 +233,7 @@ class CalendarEvent:
     def save(self):
         updated_fields = {}
         if self.summary != self._raw.get('summary'):
-            updated_fields['summary'] = self.summary
+            updated_fields['summary'] = self.summary    
         if self._extended_properties != self._raw.get('extendedProperties'):
             updated_fields['extendedProperties'] = self._extended_properties
         if updated_fields:
@@ -243,13 +243,11 @@ class CalendarEvent:
         return self._raw['status'] == 'cancelled'
 
     def is_declined_by_me(self):
-        if 'attendees' not in self._raw:
+        attendees = self._raw.get('attendees')
+        if attendees is None:
             return False
-        return any(
-            attendee['responseStatus'] == 'declined'
-            for attendee in self._raw['attendees']
-            if attendee.get('self', False)
-        )
+        user_response = next((x for x in attendees if x.get('self', False)), None)
+        return user_response is not None and user_response['responseStatus'] == 'declined'
 
     def __repr__(self):
         if self._get_is_cancelled():
