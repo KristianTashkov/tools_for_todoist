@@ -143,6 +143,10 @@ class Todoist:
         logger.info(f'Archiving item| {item}')
         self.api.items.complete(item.id, force_history=True)
 
+    def uncomplete_item(self, item):
+        logger.info(f'Uncompleting item| {item}')
+        self.api.items.uncomplete(item.id)
+
     def sync(self):
         def api_sync():
             if len(self.api.queue) > 0:

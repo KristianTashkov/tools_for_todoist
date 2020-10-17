@@ -118,8 +118,16 @@ class CalendarToTodoistService:
 
         if todoist_id is None:
             return None
-
         todoist_item = self.todoist.get_item_by_id(todoist_id)
+        if (
+            old_calendar_event is not None
+            and old_calendar_event.is_declined_by_me()
+            and not calendar_event.is_declined_by_me()
+        ):
+            calendar_event.delete_last_completed()
+            if todoist_item is not None and todoist_item.is_completed():
+                self.todoist.uncomplete_item(todoist_item)
+
         if calendar_event.next_occurrence() is None:
             if todoist_item is not None and not todoist_item.is_completed():
                 self.todoist.archive_item(todoist_item)

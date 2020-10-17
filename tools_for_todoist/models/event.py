@@ -100,6 +100,14 @@ class CalendarEvent:
             return None
         return self._extended_properties.get('private', {}).get(key)
 
+    def delete_private_info(self, key):
+        if self._extended_properties is None:
+            return
+        self._extended_properties.get('private', {}).pop(key, None)
+
+    def delete_last_completed(self):
+        self.delete_private_info(CALENDAR_LAST_COMPLETED)
+
     def _parse_start(self, raw_start):
         if 'date' in raw_start:
             return parse(raw_start['date']).date()
@@ -130,7 +138,7 @@ class CalendarEvent:
         non_cancelled_exception_starts = (
             x._get_start()
             for x in self.exceptions.values()
-            if not (x._get_is_cancelled() or x._is_declined_by_me())
+            if not (x._get_is_cancelled() or x.is_declined_by_me())
         )
         future_exception_starts = (
             start
@@ -162,7 +170,7 @@ class CalendarEvent:
             else datetime.now(UTC)
         )
         if instances is None:
-            if self._is_declined_by_me():
+            if self.is_declined_by_me():
                 return None
             return start if datetime_as(last_completed, start) < start else None
 
@@ -234,7 +242,7 @@ class CalendarEvent:
     def _get_is_cancelled(self):
         return self._raw['status'] == 'cancelled'
 
-    def _is_declined_by_me(self):
+    def is_declined_by_me(self):
         if 'attendees' not in self._raw:
             return False
         return any(
