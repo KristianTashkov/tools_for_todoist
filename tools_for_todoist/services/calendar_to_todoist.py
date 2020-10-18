@@ -26,6 +26,7 @@ from dateutil.tz import UTC, gettz
 from tools_for_todoist.models.google_calendar import GoogleCalendar
 from tools_for_todoist.models.item import TodoistItem
 from tools_for_todoist.models.todoist import Todoist
+from tools_for_todoist.storage import get_storage
 from tools_for_todoist.utils import is_allday
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,7 @@ logger = logging.getLogger(__name__)
 CALENDAR_EVENT_TODOIST_KEY = 'todoist_item_id'
 CALENDAR_EVENT_ID = 'calendar_event_id'
 CALENDAR_LAST_COMPLETED = 'last_completed'
+CALENDAR_TO_TODOIST_LABEL = 'calendar_to_todoist.label'
 
 
 def _todoist_id(calendar_event):
@@ -72,6 +74,12 @@ class CalendarToTodoistService:
     def _create_todoist_item(self, calendar_event):
         todoist_title = _todoist_title(calendar_event)
         item = TodoistItem(self.todoist, todoist_title, self.todoist.active_project_id)
+        label_name = get_storage().get_value(CALENDAR_TO_TODOIST_LABEL)
+        if label_name:
+            calendar_label_id = self.todoist.get_label_id_by_name(label_name)
+            if calendar_label_id is None:
+                calendar_label_id = self.todoist.create_label(label_name)
+            item.add_label(calendar_label_id)
         item.set_due(_next_occurrence(calendar_event), calendar_event.recurrence_string())
         item.save()
         return item

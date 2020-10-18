@@ -124,10 +124,21 @@ class Todoist:
     def get_item_by_id(self, id):
         return self._items.get(id)
 
+    def get_label_id_by_name(self, name):
+        return next(iter([x['id'] for x in self.api.state['labels'] if x['name'] == name]), None)
+
+    def create_label(self, name):
+        logger.info(f'Creating label| {name}')
+        return self.api.labels.add(name)['id']
+
     def add_item(self, item):
         logger.info(f'Adding item| {item}')
         item_raw = self.api.items.add(
-            item.content, project_id=item.project_id, priority=item.priority, due=item._due
+            item.content,
+            project_id=item.project_id,
+            priority=item.priority,
+            due=item._due,
+            labels=list(item.labels()),
         )
         self._items[item_raw['id']] = item
         return item_raw.data
@@ -159,9 +170,10 @@ class Todoist:
         )
         try:
             for temporary_key, new_id in result.get('temp_id_mapping', {}).items():
-                item = self._items.pop(temporary_key)
-                item.id = new_id
-                self._items[new_id] = item
+                item = self._items.pop(temporary_key, None)
+                if item:
+                    item.id = new_id
+                    self._items[new_id] = item
             active_project_item_updates = [
                 x
                 for x in result['items']
