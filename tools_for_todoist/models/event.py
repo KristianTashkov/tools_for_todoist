@@ -24,7 +24,7 @@ from dateutil.rrule import rrulestr
 from dateutil.tz import gettz
 from recurrent import format
 
-from tools_for_todoist.utils import ensure_datetime, is_allday
+from tools_for_todoist.utils import datetime_as, ensure_datetime, is_allday
 
 
 class CalendarEvent:
@@ -140,8 +140,9 @@ class CalendarEvent:
         return first_exception_start
 
     def next_occurrence(self, after_dt):
-        instances = self._get_rrule()
         start = self.start()
+        after_dt = datetime_as(after_dt, start)
+        instances = self._get_rrule()
         if instances is None:
             return start if after_dt < start else None
 
