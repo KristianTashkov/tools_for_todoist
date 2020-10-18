@@ -18,16 +18,13 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 import copy
 import re
-from datetime import datetime
 
 from dateutil.parser import parse
 from dateutil.rrule import rrulestr
-from dateutil.tz import UTC, gettz
+from dateutil.tz import gettz
 from recurrent import format
 
-from tools_for_todoist.utils import datetime_as, ensure_datetime, is_allday
-
-CALENDAR_LAST_COMPLETED = 'last_completed'
+from tools_for_todoist.utils import ensure_datetime, is_allday
 
 
 class CalendarEvent:
@@ -57,11 +54,7 @@ class CalendarEvent:
         if rrule is None:
             return None
 
-        start_date = self._get_start()
-        if not is_allday(start_date):
-            start_date = ensure_datetime(start_date).astimezone(UTC)
-        else:
-            start_date = ensure_datetime(start_date)
+        start_date = ensure_datetime(self.start())
         return rrulestr(rrule, dtstart=start_date, unfold=True)
 
     @staticmethod
@@ -107,7 +100,7 @@ class CalendarEvent:
         time_zone = raw_start.get('timeZone', self.google_calendar.default_timezone)
         return dt.astimezone(gettz(time_zone))
 
-    def _get_start(self):
+    def start(self):
         return self._parse_start(self._raw['start'])
 
     def _get_original_start(self):
@@ -115,7 +108,7 @@ class CalendarEvent:
 
     def _last_occurrence(self):
         instances = self._get_rrule()
-        start = self._get_start()
+        start = self.start()
         if instances is None:
             return start
 
@@ -126,21 +119,17 @@ class CalendarEvent:
             last_occurrence = last_occurrence.astimezone(start.tzinfo)
         return last_occurrence.date() if is_allday(start) else last_occurrence
 
-    def _find_next_occurrence(self, rrule_instances, last_completed):
+    def _find_next_occurrence(self, rrule_instances, after_dt):
         non_cancelled_exception_starts = (
-            x._get_start() for x in self.exceptions.values() if not x._get_is_cancelled()
+            x.start() for x in self.exceptions.values() if not x._get_is_cancelled()
         )
         future_exception_starts = (
-            start
-            for start in non_cancelled_exception_starts
-            if start > datetime_as(last_completed, start)
+            start for start in non_cancelled_exception_starts if start > after_dt
         )
         first_exception_start = min(future_exception_starts, default=None)
         exception_original_starts = {x._get_original_start() for x in self.exceptions.values()}
 
-        if is_allday(self._get_start()):
-            last_completed = ensure_datetime(last_completed.date())
-        for next_regular_occurrence in rrule_instances.xafter(last_completed):
+        for next_regular_occurrence in rrule_instances.xafter(ensure_datetime(after_dt)):
             if (
                 first_exception_start is not None
                 and first_exception_start < next_regular_occurrence
@@ -150,19 +139,13 @@ class CalendarEvent:
                 return next_regular_occurrence
         return first_exception_start
 
-    def next_occurrence(self):
+    def next_occurrence(self, after_dt):
         instances = self._get_rrule()
-        start = self._get_start()
-        last_completed = self.get_private_info(CALENDAR_LAST_COMPLETED)
-        last_completed = (
-            parse(last_completed).astimezone(UTC)
-            if last_completed is not None
-            else datetime.now(UTC)
-        )
+        start = self.start()
         if instances is None:
-            return start if datetime_as(last_completed, start) < start else None
+            return start if after_dt < start else None
 
-        next_occurrence = self._find_next_occurrence(instances, last_completed)
+        next_occurrence = self._find_next_occurrence(instances, after_dt)
         if next_occurrence is None:
             return None
         if not is_allday(start):
@@ -175,7 +158,7 @@ class CalendarEvent:
             return None
         rrule = [x for x in rrule.split('\n') if 'RRULE' in x][0]
 
-        start = self._get_start()
+        start = self.start()
         if not is_allday(start):
             start_time = f'at {start.time().hour:02}:{start.time().minute:02}'
         else:
@@ -233,4 +216,4 @@ class CalendarEvent:
     def __repr__(self):
         if self._get_is_cancelled():
             return f"{self._id}: {self._raw['originalStartTime']} cancelled"
-        return f"{self._id}: {self.summary}, {self._get_start()}, {self._raw.get('recurrence')}"
+        return f"{self._id}: {self.summary}, {self.start()}, {self._raw.get('recurrence')}"

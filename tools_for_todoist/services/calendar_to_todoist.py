@@ -18,19 +18,21 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from dateutil.tz import UTC
+from dateutil.parser import parse
+from dateutil.tz import UTC, gettz
 
-from tools_for_todoist.models.event import CALENDAR_LAST_COMPLETED
 from tools_for_todoist.models.google_calendar import GoogleCalendar
 from tools_for_todoist.models.item import TodoistItem
 from tools_for_todoist.models.todoist import Todoist
+from tools_for_todoist.utils import is_allday
 
 logger = logging.getLogger(__name__)
 
 CALENDAR_EVENT_TODOIST_KEY = 'todoist_item_id'
 CALENDAR_EVENT_ID = 'calendar_event_id'
+CALENDAR_LAST_COMPLETED = 'last_completed'
 
 
 def _todoist_id(calendar_event):
@@ -47,6 +49,13 @@ def _todoist_title(calendar_event):
     return f'[{title}]({calendar_event.html_link()})'
 
 
+def _next_occurrence(calendar_event):
+    last_completed = parse(calendar_event.get_private_info(CALENDAR_LAST_COMPLETED))
+    if is_allday(calendar_event.start()):
+        last_completed = last_completed.date()
+    return calendar_event.next_occurrence(last_completed)
+
+
 class CalendarToTodoistService:
     def __init__(self):
         self.todoist = Todoist()
@@ -58,13 +67,13 @@ class CalendarToTodoistService:
             return False
 
         todoist_item.content = _todoist_title(calendar_event)
-        todoist_item.set_due(calendar_event.next_occurrence(), calendar_event.recurrence_string())
+        todoist_item.set_due(_next_occurrence(calendar_event), calendar_event.recurrence_string())
         return todoist_item.save()
 
     def _create_todoist_item(self, calendar_event):
         todoist_title = _todoist_title(calendar_event)
         item = TodoistItem(self.todoist, todoist_title, self.todoist.active_project_id)
-        item.set_due(calendar_event.next_occurrence(), calendar_event.recurrence_string())
+        item.set_due(_next_occurrence(calendar_event), calendar_event.recurrence_string())
         item.save()
         return item
 
@@ -76,19 +85,22 @@ class CalendarToTodoistService:
             self.item_to_event[todoist_id] = calendar_event
             todoist_item = self.todoist.get_item_by_id(todoist_id)
 
-        if (
-            todoist_item is not None
-            and calendar_event.get_private_info(CALENDAR_LAST_COMPLETED) is None
-        ):
-            logger.warning(
-                f'Linked Event with missing last completion info {calendar_event} {todoist_item}'
+        if calendar_event.get_private_info(CALENDAR_LAST_COMPLETED) is None:
+            now = datetime.now(gettz(self.google_calendar.default_timezone))
+            default_last_completed = (
+                (now.date() - timedelta(1))
+                if is_allday(calendar_event.start())
+                else now.astimezone(UTC)
             )
-            calendar_event.save_private_info(
-                CALENDAR_LAST_COMPLETED, datetime.now().astimezone(UTC)
-            )
-            calendar_event.save()
+            calendar_event.save_private_info(CALENDAR_LAST_COMPLETED, default_last_completed)
+            if todoist_item is not None:
+                logger.warning(
+                    f'Linked Event with missing last completion info '
+                    f'{calendar_event} {todoist_item}'
+                )
+                calendar_event.save()
 
-        if calendar_event.next_occurrence() is None:
+        if _next_occurrence(calendar_event) is None:
             if todoist_item is None or todoist_item.is_completed():
                 return
 
@@ -120,7 +132,7 @@ class CalendarToTodoistService:
             return None
 
         todoist_item = self.todoist.get_item_by_id(todoist_id)
-        if calendar_event.next_occurrence() is None:
+        if _next_occurrence(calendar_event) is None:
             if todoist_item is not None and not todoist_item.is_completed():
                 self.todoist.archive_item(todoist_item)
             return None
@@ -176,6 +188,9 @@ class CalendarToTodoistService:
                     continue
 
                 calendar_event = self.item_to_event[item_id]
+                if not is_allday(calendar_event.start()):
+                    last_completed_date = last_completed_date.astimezone(UTC)
+
                 calendar_event.save_private_info(CALENDAR_LAST_COMPLETED, last_completed_date)
                 calendar_event.save()
 
@@ -188,11 +203,9 @@ class CalendarToTodoistService:
         google_calendar_sync_result, new_event_item_links = self._google_calendar_sync()
         todoist_sync_results = self._todoist_sync()
 
-        now = datetime.now(UTC)
         for calendar_event, todoist_item in new_event_item_links:
             calendar_event.save_private_info(CALENDAR_EVENT_TODOIST_KEY, todoist_item.id)
             calendar_event.save_private_info(CALENDAR_EVENT_ID, calendar_event.id())
-            calendar_event.save_private_info(CALENDAR_LAST_COMPLETED, now)
             calendar_event.save()
             self.item_to_event[todoist_item.id] = calendar_event
 
