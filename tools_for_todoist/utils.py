@@ -63,7 +63,7 @@ def retry_flaky_function(func, name, *, validate_result_func=None, on_failure_fu
         try:
             result = func()
             if validate_result_func is not None and not validate_result_func(result):
-                raise ValueError(f'Flaky function result was valid for result: "{result}"')
+                raise ValueError(f'Flaky function result was invalid: "{result}"')
             return result
         except Exception as e:
             if on_failure_func is not None:

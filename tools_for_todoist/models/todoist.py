@@ -61,7 +61,10 @@ class Todoist:
 
     def _initial_sync(self, active_project_name):
         self._initial_result = retry_flaky_function(
-            lambda: self.api.sync(), 'todoist_initial_sync', on_failure_func=self._recreate_api
+            self.api.sync,
+            'todoist_initial_sync',
+            on_failure_func=self._recreate_api,
+            validate_result_func=lambda x: x and 'projects' in x and 'items' in x,
         )
         self.active_project_id = [
             x for x in self._initial_result['projects'] if x['name'] == active_project_name
@@ -151,7 +154,10 @@ class Todoist:
 
         new_completed = self._new_completed()
         result = retry_flaky_function(
-            api_sync, 'todoist_api_sync', on_failure_func=self._recreate_api
+            api_sync,
+            'todoist_api_sync',
+            on_failure_func=self._recreate_api,
+            validate_result_func=lambda x: x and 'items' in x,
         )
         try:
             for temporary_key, new_id in result.get('temp_id_mapping', {}).items():
