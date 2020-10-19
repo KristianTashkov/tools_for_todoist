@@ -185,25 +185,28 @@ class CalendarToTodoistService:
             sync_result = self.todoist.sync()
             should_sync = False
 
-            for event_date, item_id in sync_result['completed']:
+            for item_id in sync_result['completed']:
                 item = self.todoist.get_item_by_id(item_id)
                 item_info = item if item is not None else f'Deleted item {item_id}'
 
-                logger.info(f'Completed Item| {event_date} {item_info}')
+                logger.info(f'Completed Item| {item_info}')
                 if item is None or item.has_parent():
                     continue
 
                 calendar_event = self.item_to_event.get(item_id)
                 if calendar_event is None:
-                    logger.warning(f'Link to calendar event missing for {item_id}')
+                    logger.warning(f'Link to calendar event missing for {item}')
                     continue
 
-                last_completed_date = calendar_event.next_occurrence(event_date)
-                if last_completed_date is not None:
-                    if not is_allday(last_completed_date):
-                        last_completed_date = last_completed_date.astimezone(UTC)
-                    calendar_event.save_private_info(CALENDAR_LAST_COMPLETED, last_completed_date)
+                current_completed = _next_occurrence(calendar_event)
+                if current_completed is None:
+                    logger.warning(f'Completion for {item} without next viable occurrence')
+                    continue
 
+                if not is_allday(current_completed):
+                    current_completed = current_completed.astimezone(UTC)
+
+                calendar_event.save_private_info(CALENDAR_LAST_COMPLETED, current_completed)
                 calendar_event.save()
 
                 if not item.is_completed():
