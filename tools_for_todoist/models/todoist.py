@@ -18,6 +18,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 import logging
 
+from dateutil.parser import parse
 from todoist.api import TodoistAPI
 
 from tools_for_todoist.models.item import TodoistItem
@@ -61,7 +62,10 @@ class Todoist:
 
     def _initial_sync(self, active_project_name):
         self._initial_result = retry_flaky_function(
-            lambda: self.api.sync(), 'todoist_initial_sync', on_failure_func=self._recreate_api
+            self.api.sync,
+            'todoist_initial_sync',
+            on_failure_func=self._recreate_api,
+            validate_result_func=lambda x: x and 'projects' in x and 'items' in x,
         )
         self.active_project_id = [
             x for x in self._initial_result['projects'] if x['name'] == active_project_name
@@ -93,10 +97,7 @@ class Todoist:
                     finished_processing = True
                     break
                 item_id = event['object_id']
-                old_item = self._items.get(item_id)
-                if old_item is not None:
-                    old_item = TodoistItem.from_raw(self, old_item.raw())
-                new_completed.add((old_item, item_id))
+                new_completed.add((parse(event['event_date']), item_id))
         self._last_completed = first_event
         return new_completed
 
@@ -123,10 +124,21 @@ class Todoist:
     def get_item_by_id(self, id):
         return self._items.get(id)
 
+    def get_label_id_by_name(self, name):
+        return next(iter([x['id'] for x in self.api.state['labels'] if x['name'] == name]), None)
+
+    def create_label(self, name):
+        logger.info(f'Creating label| {name}')
+        return self.api.labels.add(name)['id']
+
     def add_item(self, item):
         logger.info(f'Adding item| {item}')
         item_raw = self.api.items.add(
-            item.content, project_id=item.project_id, priority=item.priority, due=item._due
+            item.content,
+            project_id=item.project_id,
+            priority=item.priority,
+            due=item._due,
+            labels=list(item.labels()),
         )
         self._items[item_raw['id']] = item
         return item_raw.data
@@ -155,13 +167,17 @@ class Todoist:
 
         new_completed = self._new_completed()
         result = retry_flaky_function(
-            api_sync, 'todoist_api_sync', on_failure_func=self._recreate_api
+            api_sync,
+            'todoist_api_sync',
+            on_failure_func=self._recreate_api,
+            validate_result_func=lambda x: x and 'items' in x,
         )
         try:
             for temporary_key, new_id in result.get('temp_id_mapping', {}).items():
-                item = self._items.pop(temporary_key)
-                item.id = new_id
-                self._items[new_id] = item
+                item = self._items.pop(temporary_key, None)
+                if item:
+                    item.id = new_id
+                    self._items[new_id] = item
             active_project_item_updates = [
                 x
                 for x in result['items']

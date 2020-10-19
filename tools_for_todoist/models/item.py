@@ -34,6 +34,7 @@ class TodoistItem:
         self.priority = 1
         self._due = None
         self._raw = None
+        self._labels = set()
 
     def raw(self):
         return self._raw
@@ -51,6 +52,7 @@ class TodoistItem:
         self.priority = self._raw['priority']
         self._due = self._raw['due']
         self.project_id = self._raw['project_id']
+        self._labels = set(self._raw['labels'])
 
     def is_recurring(self):
         return self._due is not None and self._due.get('is_recurring')
@@ -101,6 +103,12 @@ class TodoistItem:
     def has_parent(self):
         return self._raw.get('parent_id') is not None
 
+    def labels(self):
+        return self._labels
+
+    def add_label(self, label_id):
+        self._labels.add(label_id)
+
     def save(self):
         if self.id == -1:
             self._raw = self.todoist.add_item(self)
@@ -114,6 +122,8 @@ class TodoistItem:
             updated_rows['priority'] = self.priority
         if self._due != self._raw['due']:
             updated_rows['due'] = self._due
+        if self._labels != set(self._raw['labels']):
+            updated_rows['labels'] = list(self._labels)
         if len(updated_rows) == 0:
             return False
         self.todoist.update_item(self, **updated_rows)
