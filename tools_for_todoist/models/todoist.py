@@ -18,7 +18,6 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 import logging
 
-from dateutil.parser import parse
 from todoist.api import TodoistAPI
 
 from tools_for_todoist.models.item import TodoistItem
@@ -96,8 +95,7 @@ class Todoist:
                 if event['id'] == self._last_completed:
                     finished_processing = True
                     break
-                item_id = event['object_id']
-                new_completed.add((parse(event['event_date']), item_id))
+                new_completed.add(event['object_id'])
         self._last_completed = first_event
         return new_completed
 
