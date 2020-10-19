@@ -93,14 +93,6 @@ class CalendarEvent:
             return None
         return self._extended_properties.get('private', {}).get(key)
 
-    def delete_private_info(self, key):
-        if self._extended_properties is None:
-            return
-        self._extended_properties.get('private', {}).pop(key, None)
-
-    def delete_last_completed(self):
-        self.delete_private_info(CALENDAR_LAST_COMPLETED)
-
     def _parse_start(self, raw_start):
         if 'date' in raw_start:
             return parse(raw_start['date']).date()

@@ -143,7 +143,6 @@ class CalendarToTodoistService:
             and old_calendar_event.is_declined_by_me()
             and not calendar_event.is_declined_by_me()
         ):
-            # calendar_event.delete_last_completed()
             if todoist_item is not None and todoist_item.is_completed():
                 self.todoist.uncomplete_item(todoist_item)
 
