@@ -145,9 +145,9 @@ class CalendarEvent:
         start = self.start()
         after_dt = datetime_as(after_dt, start)
         instances = self._get_rrule()
+        if self.is_declined_by_me():
+            return None
         if instances is None:
-            if self.is_declined_by_me():
-                return None
             return start if after_dt < start else None
 
         next_occurrence = self._find_next_occurrence(instances, after_dt)
