@@ -115,7 +115,7 @@ class GoogleCalendar:
             if recurring_event_id in cancelled_events_ids:
                 continue
             if recurring_event_id not in self._events:
-                logger.warning(
+                logger.debug(
                     f'Skipping recurring event exception for missing event: '
                     f'{event.get("summary")} {event.get("status")} {event.get("originalStartTime")}'
                 )

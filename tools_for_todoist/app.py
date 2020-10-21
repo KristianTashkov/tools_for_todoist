@@ -37,6 +37,7 @@ def setup_logger(logging_level=logging.DEBUG):
 
 def run_sync_service(logger):
     sync_service = CalendarToTodoistService()
+    logger.info('Started syncing service.')
 
     while True:
         result = sync_service.sync()
