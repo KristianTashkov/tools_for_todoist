@@ -132,7 +132,7 @@ class CalendarEventTests(TestCase):
         after_event = date(year=2020, month=1, day=11)
         self.assertEqual(event.next_occurrence(after_event), date(year=2020, month=1, day=12))
 
-    def test_ending_recurring_all_day_next_occurence(self):
+    def test_ending_recurring_all_day_next_occurrence(self):
         event = (
             EventBuilder()
             .set_start_date(date='2020-01-10')
@@ -151,7 +151,7 @@ class CalendarEventTests(TestCase):
         after_ending = date(year=2020, month=1, day=21)
         self.assertEqual(event.next_occurrence(after_ending), None)
 
-    def test_ending_utc_recurring_all_day_next_occurence(self):
+    def test_ending_utc_recurring_all_day_next_occurrence(self):
         event = (
             EventBuilder()
             .set_start_date(date='2020-01-10')
@@ -170,7 +170,7 @@ class CalendarEventTests(TestCase):
         after_ending = date(year=2020, month=1, day=21)
         self.assertEqual(event.next_occurrence(after_ending), None)
 
-    def test_ending_count_recurring_all_day_next_occurence(self):
+    def test_ending_count_recurring_all_day_next_occurrence(self):
         event = (
             EventBuilder()
             .set_start_date(date='2020-01-10')
@@ -187,4 +187,108 @@ class CalendarEventTests(TestCase):
         exact_ending = date(year=2020, month=1, day=20)
         self.assertEqual(event.next_occurrence(exact_ending), None)
         after_ending = date(year=2020, month=1, day=21)
+        self.assertEqual(event.next_occurrence(after_ending), None)
+
+    def test_recurring_next_occurrence(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('DAILY')
+            .create_event()
+        )
+        expected_start = datetime(
+            year=2020,
+            month=1,
+            day=10,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+
+        before_event = datetime(
+            year=2020,
+            month=1,
+            day=1,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        self.assertEqual(event.next_occurrence(before_event), expected_start)
+        exact_event = before_event.replace(day=10)
+        expected_start = expected_start.replace(day=11)
+        self.assertEqual(event.next_occurrence(exact_event), expected_start)
+        after_event = exact_event.replace(day=11)
+        expected_start = expected_start.replace(day=12)
+        self.assertEqual(event.next_occurrence(after_event), expected_start)
+
+    def test_recurring_ending_date_next_occurrence(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('DAILY', until='20200120T091000Z')
+            .create_event()
+        )
+        expected_start = datetime(
+            year=2020,
+            month=1,
+            day=10,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+
+        before_event = datetime(
+            year=2020,
+            month=1,
+            day=1,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        self.assertEqual(event.next_occurrence(before_event), expected_start)
+        exact_event = before_event.replace(day=10)
+        expected_start = expected_start.replace(day=11)
+        self.assertEqual(event.next_occurrence(exact_event), expected_start)
+        last_event = exact_event.replace(day=19)
+        expected_start = expected_start.replace(day=20)
+        self.assertEqual(event.next_occurrence(last_event), expected_start)
+        exact_ending = last_event.replace(day=20)
+        self.assertEqual(event.next_occurrence(exact_ending), None)
+        after_ending = exact_ending.replace(day=21)
+        self.assertEqual(event.next_occurrence(after_ending), None)
+
+    def test_recurring_ending_count_next_occurrence(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('DAILY', count=11)
+            .create_event()
+        )
+        expected_start = datetime(
+            year=2020,
+            month=1,
+            day=10,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+
+        before_event = datetime(
+            year=2020,
+            month=1,
+            day=1,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        self.assertEqual(event.next_occurrence(before_event), expected_start)
+        exact_event = before_event.replace(day=10)
+        expected_start = expected_start.replace(day=11)
+        self.assertEqual(event.next_occurrence(exact_event), expected_start)
+        last_event = exact_event.replace(day=19)
+        expected_start = expected_start.replace(day=20)
+        self.assertEqual(event.next_occurrence(last_event), expected_start)
+        exact_ending = last_event.replace(day=20)
+        self.assertEqual(event.next_occurrence(exact_ending), None)
+        after_ending = exact_ending.replace(day=21)
         self.assertEqual(event.next_occurrence(after_ending), None)
