@@ -47,6 +47,28 @@ class CalendarEvent:
         recurrence = self._raw.get('recurrence')
         if recurrence is None:
             return None
+        if is_allday(self.start()):
+
+            def fix_utc(recurrence_line):
+                if 'RRULE' not in recurrence_line or 'UNTIL' not in recurrence_line:
+                    return recurrence_line
+                until_matcher = r'UNTIL=(\d{8}T\d{6}Z)'
+                match = re.search(until_matcher, recurrence_line)
+                if match:
+                    new_end = (
+                        parse(match.groups()[0])
+                        .astimezone(gettz(self.google_calendar.default_timezone))
+                        .date()
+                    )
+                    recurrence_line = re.sub(
+                        until_matcher,
+                        f"UNTIL={new_end.year}{new_end.month:02}{new_end.day:02}",
+                        recurrence_line,
+                    )
+                return recurrence_line
+
+            recurrence = [fix_utc(x) for x in recurrence]
+
         return '\n'.join(recurrence)
 
     def _get_rrule(self):

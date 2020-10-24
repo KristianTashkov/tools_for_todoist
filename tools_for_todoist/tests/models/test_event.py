@@ -94,10 +94,8 @@ class CalendarEventTests(TestCase):
 
         before_event = date(year=2020, month=1, day=9)
         self.assertEqual(event.next_occurrence(before_event), date(year=2020, month=1, day=10))
-
         exact_event = date(year=2020, month=1, day=10)
         self.assertEqual(event.next_occurrence(exact_event), None)
-
         after_event = date(year=2020, month=1, day=11)
         self.assertEqual(event.next_occurrence(after_event), None)
 
@@ -115,13 +113,78 @@ class CalendarEventTests(TestCase):
 
         before_event = datetime(year=2020, month=1, day=1, hour=9, tzinfo=gettz(default_timezone))
         self.assertEqual(event.next_occurrence(before_event), expected_start)
-
         exact_event = datetime(
             year=2020, month=1, day=1, hour=10, minute=10, tzinfo=gettz(default_timezone)
         )
         self.assertEqual(event.next_occurrence(exact_event), None)
-
         after_event = event.next_occurrence(
             datetime(year=2020, month=1, day=1, hour=11, tzinfo=gettz(default_timezone))
         )
         self.assertEqual(after_event, None)
+
+    def test_recurring_all_day_next_occurrence(self):
+        event = EventBuilder().set_start_date(date='2020-01-10').set_rrule('DAILY').create_event()
+
+        before_event = date(year=2020, month=1, day=1)
+        self.assertEqual(event.next_occurrence(before_event), date(year=2020, month=1, day=10))
+        exact_event = date(year=2020, month=1, day=10)
+        self.assertEqual(event.next_occurrence(exact_event), date(year=2020, month=1, day=11))
+        after_event = date(year=2020, month=1, day=11)
+        self.assertEqual(event.next_occurrence(after_event), date(year=2020, month=1, day=12))
+
+    def test_ending_recurring_all_day_next_occurence(self):
+        event = (
+            EventBuilder()
+            .set_start_date(date='2020-01-10')
+            .set_rrule('DAILY', until='20200120')
+            .create_event()
+        )
+
+        before_event = date(year=2020, month=1, day=1)
+        self.assertEqual(event.next_occurrence(before_event), date(year=2020, month=1, day=10))
+        exact_event = date(year=2020, month=1, day=10)
+        self.assertEqual(event.next_occurrence(exact_event), date(year=2020, month=1, day=11))
+        last_event = date(year=2020, month=1, day=19)
+        self.assertEqual(event.next_occurrence(last_event), date(year=2020, month=1, day=20))
+        exact_ending = date(year=2020, month=1, day=20)
+        self.assertEqual(event.next_occurrence(exact_ending), None)
+        after_ending = date(year=2020, month=1, day=21)
+        self.assertEqual(event.next_occurrence(after_ending), None)
+
+    def test_ending_utc_recurring_all_day_next_occurence(self):
+        event = (
+            EventBuilder()
+            .set_start_date(date='2020-01-10')
+            .set_rrule('DAILY', until='20200120T225959Z')
+            .create_event()
+        )
+
+        before_event = date(year=2020, month=1, day=1)
+        self.assertEqual(event.next_occurrence(before_event), date(year=2020, month=1, day=10))
+        exact_event = date(year=2020, month=1, day=10)
+        self.assertEqual(event.next_occurrence(exact_event), date(year=2020, month=1, day=11))
+        last_event = date(year=2020, month=1, day=19)
+        self.assertEqual(event.next_occurrence(last_event), date(year=2020, month=1, day=20))
+        exact_ending = date(year=2020, month=1, day=20)
+        self.assertEqual(event.next_occurrence(exact_ending), None)
+        after_ending = date(year=2020, month=1, day=21)
+        self.assertEqual(event.next_occurrence(after_ending), None)
+
+    def test_ending_count_recurring_all_day_next_occurence(self):
+        event = (
+            EventBuilder()
+            .set_start_date(date='2020-01-10')
+            .set_rrule('DAILY', count=11)
+            .create_event()
+        )
+
+        before_event = date(year=2020, month=1, day=1)
+        self.assertEqual(event.next_occurrence(before_event), date(year=2020, month=1, day=10))
+        exact_event = date(year=2020, month=1, day=10)
+        self.assertEqual(event.next_occurrence(exact_event), date(year=2020, month=1, day=11))
+        last_event = date(year=2020, month=1, day=19)
+        self.assertEqual(event.next_occurrence(last_event), date(year=2020, month=1, day=20))
+        exact_ending = date(year=2020, month=1, day=20)
+        self.assertEqual(event.next_occurrence(exact_ending), None)
+        after_ending = date(year=2020, month=1, day=21)
+        self.assertEqual(event.next_occurrence(after_ending), None)

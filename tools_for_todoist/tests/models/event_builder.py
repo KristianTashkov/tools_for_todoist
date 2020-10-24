@@ -78,3 +78,17 @@ class EventBuilder:
     def set_original_start_date(self, date=None, datetime=None, timezone=None):
         self._set_date('originalStartTime', date, datetime, timezone)
         return self
+
+    def set_rrule(self, freq, interval=None, byday=None, until=None, count=None):
+        assert not (until is not None and count is not None)
+        recurrence_string = f'RRULE:FREQ={freq}'
+        if interval:
+            recurrence_string += f';INTERVAL={interval}'
+        if byday:
+            recurrence_string += f';BYDAY={byday}'
+        if until:
+            recurrence_string += f';UNTIL={until}'
+        if count:
+            recurrence_string += f';COUNT={count}'
+        self._raw['recurrence'] = [recurrence_string]
+        return self
