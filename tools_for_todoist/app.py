@@ -26,12 +26,13 @@ from tools_for_todoist.services.calendar_to_todoist import CalendarToTodoistServ
 def setup_logger(logging_level=logging.DEBUG):
     logger = logging.getLogger()
     logger.handlers.clear()
-    logger.setLevel(logging_level)
     stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(logging_level)
     formatter = logging.Formatter('[%(levelname)s] %(name)s: %(message)s')
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
+
+    logger = logging.getLogger('tools_for_todoist')
+    logger.setLevel(logging_level)
     return logger
 
 
