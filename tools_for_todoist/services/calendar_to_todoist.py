@@ -137,12 +137,20 @@ class CalendarToTodoistService:
 
         if todoist_id is None:
             return None
-
         todoist_item = self.todoist.get_item_by_id(todoist_id)
+
         if _next_occurrence(calendar_event) is None:
             if todoist_item is not None and not todoist_item.is_completed():
                 self.todoist.archive_item(todoist_item)
             return None
+
+        if (
+            todoist_item is not None
+            and todoist_item.is_completed()
+            and old_calendar_event is not None
+            and _next_occurrence(old_calendar_event) is None
+        ):
+            self.todoist.uncomplete_item(todoist_item)
 
         logger.debug(f'Updating event| old:{old_calendar_event} new:{calendar_event}')
         if todoist_item is not None:

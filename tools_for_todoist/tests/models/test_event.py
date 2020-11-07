@@ -295,6 +295,299 @@ class CalendarEventTests(TestCase):
         after_ending = exact_ending.replace(day=21)
         self.assertEqual(event.next_occurrence(after_ending), None)
 
+    def test_recurring_declined_next_occurrence(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('WEEKLY')
+            .add_attendee(is_self=True, status='declined')
+            .create_event()
+        )
+
+        before_event = datetime(
+            year=2020,
+            month=1,
+            day=1,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        self.assertEqual(event.next_occurrence(before_event), None)
+
+    def test_recurring_others_declined_next_occurrence(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('WEEKLY')
+            .add_attendee(is_self=True, status='accepted')
+            .add_attendee(is_self=False, status='declined')
+            .create_event()
+        )
+
+        before_event = datetime(
+            year=2020,
+            month=1,
+            day=1,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        self.assertEqual(event.next_occurrence(before_event), None)
+
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('WEEKLY')
+            .add_attendee(is_self=True, status='accepted')
+            .add_attendee(is_self=False, status='declined')
+            .add_attendee(is_self=False, status='accepted')
+            .create_event()
+        )
+        next_event = datetime(
+            year=2020,
+            month=1,
+            day=10,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        self.assertEqual(event.next_occurrence(before_event), next_event)
+
+    def test_recurring_others_declined_instance_next_occurrence(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('WEEKLY')
+            .create_event()
+        )
+        event_exception = (
+            EventBuilder()
+            .set_recurring_event_id(event.id())
+            .set_original_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .add_attendee(is_self=True, status='accepted')
+            .add_attendee(is_self=False, status='declined')
+            .create_event()
+        )
+        event.update_exception(event_exception.raw())
+
+        before_event = datetime(
+            year=2020,
+            month=1,
+            day=1,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        next_event = datetime(
+            year=2020,
+            month=1,
+            day=17,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        self.assertEqual(event.next_occurrence(before_event), next_event)
+
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('WEEKLY')
+            .create_event()
+        )
+        event_exception = (
+            EventBuilder()
+            .set_recurring_event_id(event.id())
+            .set_original_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .add_attendee(is_self=True, status='accepted')
+            .add_attendee(is_self=False, status='declined')
+            .add_attendee(is_self=False, status='accepted')
+            .create_event()
+        )
+        event.update_exception(event_exception.raw())
+        next_event = next_event.replace(day=10)
+        self.assertEqual(event.next_occurrence(before_event), next_event)
+
+    def test_recurring_declined_with_accepted_exception_next_occurrence(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('WEEKLY')
+            .add_attendee(is_self=True, status='declined')
+            .create_event()
+        )
+        event_exception = (
+            EventBuilder()
+            .set_recurring_event_id(event.id())
+            .set_original_start_date(datetime='2020-01-17T10:10:00+01:00')
+            .set_start_date(datetime='2020-01-17T10:10:00+01:00')
+            .add_attendee(is_self=True, status='accepted')
+            .create_event()
+        )
+        event.update_exception(event_exception.raw())
+
+        expected_next = datetime(
+            year=2020,
+            month=1,
+            day=17,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        before_event = datetime(
+            year=2020,
+            month=1,
+            day=1,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        self.assertEqual(event.next_occurrence(before_event), expected_next)
+
+    def test_recurring_next_moved_next_occurrence(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('DAILY')
+            .create_event()
+        )
+        event_exception = (
+            EventBuilder()
+            .set_recurring_event_id(event.id())
+            .set_original_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_start_date(datetime='2020-01-11T10:10:00+01:00')
+            .create_event()
+        )
+        event.update_exception(event_exception.raw())
+
+        before_event = datetime(
+            year=2020,
+            month=1,
+            day=1,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        expected_next = datetime(
+            year=2020,
+            month=1,
+            day=11,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        self.assertEqual(event.next_occurrence(before_event), expected_next)
+
+    def test_recurring_instances_rearranged_next_occurrence(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('WEEKLY')
+            .create_event()
+        )
+        event_exception = (
+            EventBuilder()
+            .set_recurring_event_id(event.id())
+            .set_original_start_date(datetime='2020-01-24T10:10:00+01:00')
+            .set_start_date(datetime='2020-01-15T10:10:00+01:00')
+            .create_event()
+        )
+        event.update_exception(event_exception.raw())
+
+        before_event = datetime(
+            year=2020,
+            month=1,
+            day=11,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        expected_next = datetime(
+            year=2020,
+            month=1,
+            day=15,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        self.assertEqual(event.next_occurrence(before_event), expected_next)
+
+    def test_recurring_next_cancelled_next_occurrence(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('WEEKLY')
+            .create_event()
+        )
+        event_exception = (
+            EventBuilder()
+            .set_recurring_event_id(event.id())
+            .set_original_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_status('cancelled')
+            .create_event()
+        )
+        event.update_exception(event_exception.raw())
+
+        before_event = datetime(
+            year=2020,
+            month=1,
+            day=1,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        expected_next = datetime(
+            year=2020,
+            month=1,
+            day=17,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        self.assertEqual(event.next_occurrence(before_event), expected_next)
+
+        event_exception._raw['status'] = 'accepted'
+        event.update_exception(event_exception.raw())
+        expected_next = expected_next.replace(day=10)
+        self.assertEqual(event.next_occurrence(before_event), expected_next)
+
+    def test_recurring_next_declined_next_occurrence(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('WEEKLY')
+            .create_event()
+        )
+        event_exception = (
+            EventBuilder()
+            .set_recurring_event_id(event.id())
+            .set_original_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .add_attendee(is_self=True, status='declined')
+            .create_event()
+        )
+        event.update_exception(event_exception.raw())
+
+        before_event = datetime(
+            year=2020,
+            month=1,
+            day=1,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        expected_next = datetime(
+            year=2020,
+            month=1,
+            day=17,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        self.assertEqual(event.next_occurrence(before_event), expected_next)
+
     def test_daily_recurrence_string(self):
         cases = [
             (None, 'day'),

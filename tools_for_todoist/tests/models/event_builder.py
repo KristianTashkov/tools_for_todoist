@@ -92,3 +92,17 @@ class EventBuilder:
             recurrence_string += f';COUNT={count}'
         self._raw['recurrence'] = [recurrence_string]
         return self
+
+    def set_recurring_event_id(self, event_id):
+        self._raw['recurringEventId'] = event_id
+        return self
+
+    def set_status(self, status):
+        self._raw['status'] = status
+        return self
+
+    def add_attendee(self, *, is_self=False, status='accepted'):
+        if 'attendees' not in self._raw:
+            self._raw['attendees'] = []
+        self._raw['attendees'].append({'self': is_self, 'responseStatus': status})
+        return self

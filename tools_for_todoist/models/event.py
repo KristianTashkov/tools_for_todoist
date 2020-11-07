@@ -141,13 +141,18 @@ class CalendarEvent:
 
     def _find_next_occurrence(self, rrule_instances, after_dt):
         non_cancelled_exception_starts = (
-            x.start() for x in self.exceptions.values() if not x._get_is_cancelled()
+            x.start()
+            for x in self.exceptions.values()
+            if not (x._get_is_cancelled() or x.is_declined_by_me() or x.is_declined_by_others())
         )
         future_exception_starts = (
             start for start in non_cancelled_exception_starts if start > after_dt
         )
         first_exception_start = min(future_exception_starts, default=None)
+
         exception_original_starts = {x._get_original_start() for x in self.exceptions.values()}
+        if self.is_declined_by_me() or self.is_declined_by_others():
+            return first_exception_start
 
         for next_regular_occurrence in rrule_instances.xafter(ensure_datetime(after_dt)):
             if (
@@ -163,15 +168,16 @@ class CalendarEvent:
         start = self.start()
         after_dt = datetime_as(after_dt, start)
         instances = self._get_rrule()
+
         if instances is None:
             return start if after_dt < start else None
 
         next_occurrence = self._find_next_occurrence(instances, after_dt)
         if next_occurrence is None:
             return None
-        if not is_allday(start):
-            next_occurrence = next_occurrence.astimezone(start.tzinfo)
-        return next_occurrence.date() if is_allday(start) else next_occurrence
+        return (
+            next_occurrence.date() if is_allday(start) else next_occurrence.astimezone(start.tzinfo)
+        )
 
     def recurrence_string(self):
         rrule = self._get_recurrence()
@@ -224,6 +230,16 @@ class CalendarEvent:
 
     def _get_is_cancelled(self):
         return self._raw['status'] == 'cancelled'
+
+    def is_declined_by_me(self):
+        attendees = self._raw.get('attendees', [])
+        self_response = next((x for x in attendees if x.get('self', False)), None)
+        return self_response is not None and self_response['responseStatus'] == 'declined'
+
+    def is_declined_by_others(self):
+        other_attendees = [x for x in self._raw.get('attendees', []) if not x.get('self', False)]
+        all_declined = all([x['responseStatus'] == 'declined' for x in other_attendees])
+        return len(other_attendees) > 0 and all_declined
 
     def __repr__(self):
         if self._get_is_cancelled():
