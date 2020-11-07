@@ -18,7 +18,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 import logging
 
-from todoist.api import TodoistAPI
+from todoist.api import SyncError, TodoistAPI
 
 from tools_for_todoist.models.item import TodoistItem
 from tools_for_todoist.storage import get_storage
@@ -165,6 +165,7 @@ class Todoist:
             'todoist_api_sync',
             on_failure_func=self._recreate_api,
             validate_result_func=lambda x: x and 'items' in x,
+            critical_errors=[SyncError],
         )
         try:
             for temporary_key, new_id in result.get('temp_id_mapping', {}).items():

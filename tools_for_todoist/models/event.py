@@ -22,8 +22,8 @@ import re
 from dateutil.parser import parse
 from dateutil.rrule import rrulestr
 from dateutil.tz import gettz
-from recurrent import format
 
+from tools_for_todoist.models.rrule import rrule_to_string
 from tools_for_todoist.utils import datetime_as, ensure_datetime, is_allday
 
 
@@ -131,8 +131,6 @@ class CalendarEvent:
     def _last_occurrence(self):
         instances = self._get_rrule()
         start = self.start()
-        if instances is None:
-            return start
 
         if instances.count() == 0:
             return None
@@ -183,42 +181,33 @@ class CalendarEvent:
 
         start = self.start()
         if not is_allday(start):
-            start_time = f'at {start.time().hour:02}:{start.time().minute:02}'
+            start_time = f'at {start.time().hour:02}:{start.time().minute:02} '
         else:
             start_time = ''
 
-        formatted = format(rrule)
-        formatted = formatted.replace('daily', 'every day')
-        match = re.search(r'until (.*)Z', formatted)
+        formatted = rrule_to_string(rrule)
+        match = re.search(r'until (.*Z|[\d]{8})', formatted)
         if match is not None:
             until_date = parse(match.groups()[0])
 
             formatted = (
                 f'{formatted[:match.span()[0]]}'
-                f' {start_time} until {until_date.date().isoformat()}'
+                f'{start_time}until {until_date.date().isoformat()}'
                 f'{formatted[match.span()[1]:]}'
             )
             start_time = None
-        match = re.search(r'(.*) of every month', formatted)
-        if match is not None:
-            formatted = (
-                f'{formatted[:match.span()[0]]}'
-                f'every {match.groups()[0]}'
-                f'{formatted[match.span()[1]:]}'
-            )
-        formatted = re.sub(r'week on ', '', formatted)
-        match = re.search(r'for ([\d]*) times|twice', formatted)
+        match = re.search(r'for ([\d]*) times', formatted)
         if match:
             last_instance = self._last_occurrence()
-            last_instance = f'{last_instance.year}-{last_instance.month}-{last_instance.day}'
+            last_instance = f'{last_instance.year}-{last_instance.month:02}-{last_instance.day:02}'
             formatted = (
                 f'{formatted[:match.span()[0]]}'
-                f'{start_time} until {last_instance}'
+                f'{start_time}until {last_instance}'
                 f'{formatted[match.span()[1]:]}'
             )
             start_time = None
-        if start_time is not None:
-            formatted += f' {start_time}'
+        if start_time:
+            formatted += f' {start_time.strip()}'
         return formatted
 
     def html_link(self):

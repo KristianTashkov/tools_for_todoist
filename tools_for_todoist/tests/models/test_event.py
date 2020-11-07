@@ -19,6 +19,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 from datetime import date, datetime
 from unittest.case import TestCase
 
+import pytest
 from dateutil.tz import gettz
 
 from tools_for_todoist.tests.models.event_builder import EventBuilder
@@ -35,6 +36,7 @@ class CalendarEventTests(TestCase):
 
     def test_empty_private_info(self):
         event = EventBuilder().create_event()
+        self.assertEqual(event.get_private_info('key'), None)
         event.save_private_info('key', 'value')
         self.assertEqual(event.get_private_info('key'), 'value')
 
@@ -292,3 +294,128 @@ class CalendarEventTests(TestCase):
         self.assertEqual(event.next_occurrence(exact_ending), None)
         after_ending = exact_ending.replace(day=21)
         self.assertEqual(event.next_occurrence(after_ending), None)
+
+    def test_daily_recurrence_string(self):
+        cases = [
+            (None, 'day'),
+            (1, 'day'),
+            (2, 'other day'),
+            (3, '3 days'),
+            (10, '10 days'),
+        ]
+        for interval, expected_clarification in cases:
+            event = (
+                EventBuilder()
+                .set_start_date(date='2020-01-10')
+                .set_rrule('DAILY', interval=interval)
+                .create_event()
+            )
+            self.assertEqual(event.recurrence_string(), f'every {expected_clarification}')
+
+    def test_weekly_recurrence_string(self):
+        byday_configs = [
+            ('MO', 'Mon'),
+            ('MO,TU,WE,TH,FR,SA,SU', 'Mon, Tue, Wed, Thu, Fri, Sat, Sun'),
+        ]
+        for byday, byday_word in byday_configs:
+            intervals = [
+                (1, f'{byday_word}'),
+                (2, f'other {byday_word}'),
+                (3, f'3rd {byday_word}'),
+                (4, f'4th {byday_word}'),
+                (10, '10 weeks'),
+            ]
+            for interval, expected_clarification in intervals:
+                event = (
+                    EventBuilder()
+                    .set_start_date(date='2020-01-10')
+                    .set_rrule('WEEKLY', interval=interval, byday=byday)
+                    .create_event()
+                )
+                self.assertEqual(event.recurrence_string(), f'every {expected_clarification}')
+
+    def test_monthly_recurrence_string(self):
+        byday_config = [
+            (None, None, 'month'),
+            (1, None, 'month'),
+            (2, None, 'other month'),
+            (3, None, '3rd month'),
+            (10, None, '10 months'),
+            (None, '1MO', 'first Mon'),
+            (1, '1MO', 'first Mon'),
+            (1, '2TU', 'second Tue'),
+            (1, '3FR', 'third Fri'),
+            (1, '4SU', 'fourth Sun'),
+            (2, '4SU', 'fourth Sun'),
+        ]
+        for interval, byday, expected_clarification in byday_config:
+            event = (
+                EventBuilder()
+                .set_start_date(date='2020-01-01')
+                .set_rrule('MONTHLY', interval=interval, byday=byday)
+                .create_event()
+            )
+            self.assertEqual(event.recurrence_string(), f'every {expected_clarification}')
+
+    def test_yearly_recurrence_string(self):
+        cases = [
+            (None, 'year'),
+            (1, 'year'),
+            (2, '2 years'),
+            (10, '10 years'),
+        ]
+        for interval, expected_clarification in cases:
+            event = (
+                EventBuilder()
+                .set_start_date(date='2020-01-10')
+                .set_rrule('YEARLY', interval=interval)
+                .create_event()
+            )
+            self.assertEqual(event.recurrence_string(), f'every {expected_clarification}')
+
+    def test_datetime_recurrence_string(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('DAILY')
+            .create_event()
+        )
+        self.assertEqual(event.recurrence_string(), 'every day at 10:10')
+
+    def test_count_recurrence_string(self):
+        event = (
+            EventBuilder()
+            .set_start_date(date='2020-01-10')
+            .set_rrule('DAILY', count=10)
+            .create_event()
+        )
+        self.assertEqual(event.recurrence_string(), 'every day until 2020-01-19')
+
+    def test_count_datetime_recurrence_string(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('DAILY', count=3)
+            .create_event()
+        )
+        self.assertEqual(event.recurrence_string(), 'every day at 10:10 until 2020-01-12')
+
+    def test_until_recurrence_string(self):
+        event = (
+            EventBuilder()
+            .set_start_date(date='2020-01-10')
+            .set_rrule('DAILY', until='20200120')
+            .create_event()
+        )
+        self.assertEqual(event.recurrence_string(), 'every day until 2020-01-20')
+
+    # TODO(hrisi): fix datetime until recurrence
+    @pytest.mark.skip
+    def test_until_datetime_recurrence_string(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('DAILY', until='20200121T085959Z')
+            .create_event()
+        )
+        self.assertEqual(event.recurrence_string(), 'every day at 10:10 until 2020-01-20')

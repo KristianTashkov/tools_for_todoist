@@ -38,7 +38,6 @@ setuptools.setup(
         'google-api-python-client==1.12.2',
         'google-auth-httplib2==0.0.4',
         'google-auth-oauthlib==0.4.1',
-        'recurrent==0.4.0',
         'python-dateutil==2.8.1',
         'psycopg2-binary==2.8.6',
     ],
