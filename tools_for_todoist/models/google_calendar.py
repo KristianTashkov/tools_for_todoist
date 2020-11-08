@@ -20,6 +20,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 import json
 import logging
 import os
+from collections import defaultdict
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -65,12 +66,25 @@ def _do_auth():
     return token
 
 
+class GoogleCalendarSyncResult:
+    def __init__(self, raw_results):
+        self.created_events = []
+        self.created_events_ids = set()
+        self.cancelled_events = []
+        self.updated_events = []
+        self.updated_events_ids = set()
+        self.cancelled_events_ids = set()
+        self.raw_results = raw_results
+        self.merged_event_instances = []
+
+
 class GoogleCalendar:
     def __init__(self):
         self._recreate_api()
         self._calendar_id = get_storage().get_value(GOOGLE_CALENDAR_CALENDAR_ID)
         self._raw_events = []
         self._events = {}
+        self._single_exceptions = defaultdict(list)
         self.sync_token = None
         self.default_timezone = (
             self.api.calendars().get(calendarId=self._calendar_id).execute()['timeZone']
@@ -80,62 +94,60 @@ class GoogleCalendar:
         token = _do_auth()
         self.api = build('calendar', 'v3', credentials=token, cache_discovery=False)
 
-    def _process_sync(self):
-        created_events = []
-        created_events_ids = set()
-        cancelled_events = []
-        updated_events = []
-        updated_events_ids = set()
-        pending_exceptions = []
-        cancelled_events_ids = set()
+    def _process_raw_event(self, raw_event, sync_result):
+        if raw_event['status'] == 'cancelled':
+            canceled_event = self._events.pop(raw_event['id'], None)
+            if canceled_event is not None:
+                sync_result.cancelled_events.append(canceled_event)
+            sync_result.cancelled_events_ids.add(raw_event['id'])
+        elif raw_event['id'] not in self._events:
+            new_event = CalendarEvent.from_raw(self, raw_event)
+            self._events[raw_event['id']] = new_event
+            sync_result.created_events.append(new_event)
+            sync_result.created_events_ids.add(raw_event['id'])
 
-        for event in self._raw_events:
-            recurring_event_id = event.get('recurringEventId')
-            if recurring_event_id is not None:
-                pending_exceptions.append(event)
-            elif event['status'] == 'cancelled':
-                canceled_event = self._events.pop(event['id'], None)
-                if canceled_event is not None:
-                    cancelled_events.append(canceled_event)
-                cancelled_events_ids.add(event['id'])
-            elif event['id'] not in self._events:
-                new_event = CalendarEvent.from_raw(self, event)
-                self._events[event['id']] = new_event
-                created_events.append(new_event)
-                created_events_ids.add(event['id'])
+            if raw_event.get('recurringEventId') is not None:
+                self._single_exceptions[raw_event['recurringEventId']].append(new_event)
             else:
-                event_model = self._events[event['id']]
-                old_event_copy = CalendarEvent.from_raw(self, event_model.raw())
-                event_model.update_from_raw(event)
-                updated_events.append((old_event_copy, event_model))
-                updated_events_ids.add(event['id'])
+                single_exceptions = self._single_exceptions.pop(raw_event['id'], [])
+                for single_exception in single_exceptions:
+                    new_event.update_exception(single_exception.raw())
+                    sync_result.merged_event_instances.append(single_exception)
 
-        for event in pending_exceptions:
-            recurring_event_id = event.get('recurringEventId')
-            if recurring_event_id in cancelled_events_ids:
+        else:
+            event_model = self._events[raw_event['id']]
+            old_event_copy = CalendarEvent.from_raw(self, event_model.raw())
+            event_model.update_from_raw(raw_event)
+            sync_result.updated_events.append((old_event_copy, event_model))
+            sync_result.updated_events_ids.add(raw_event['id'])
+
+    def _process_sync(self, sync_result):
+        pending_exceptions = []
+
+        for raw_event in self._raw_events:
+            recurring_event_id = raw_event.get('recurringEventId')
+            if recurring_event_id is not None:
+                pending_exceptions.append(raw_event)
+            else:
+                self._process_raw_event(raw_event, sync_result)
+
+        for raw_event in pending_exceptions:
+            recurring_event_id = raw_event.get('recurringEventId')
+            if recurring_event_id in sync_result.cancelled_events_ids:
                 continue
             if recurring_event_id not in self._events:
-                logger.debug(
-                    f'Skipping recurring event exception for missing event: '
-                    f'{event.get("summary")} {event.get("status")} {event.get("originalStartTime")}'
-                )
+                self._process_raw_event(raw_event, sync_result)
                 continue
+
             recurring_event = self._events[recurring_event_id]
-            recurring_event.update_exception(event)
+            recurring_event.update_exception(raw_event)
             # TODO(daniel): Implement this properly
             if (
-                recurring_event_id not in updated_events_ids
-                and recurring_event_id not in created_events_ids
+                recurring_event_id not in sync_result.updated_events_ids
+                and recurring_event_id not in sync_result.created_events_ids
             ):
-                updated_events.append((None, recurring_event))
-                updated_events_ids.add(recurring_event_id)
-
-        return {
-            'created': created_events,
-            'cancelled': cancelled_events,
-            'updated': updated_events,
-            'exceptions': pending_exceptions,
-        }
+                sync_result.updated_events.append((None, recurring_event))
+                sync_result.updated_events_ids.add(recurring_event_id)
 
     def get_event_by_id(self, event_id):
         return self._events.get(event_id)
@@ -159,6 +171,7 @@ class GoogleCalendar:
             self._raw_events.extend(response['items'])
             request = self.api.events().list_next(request, response)
         self.sync_token = response['nextSyncToken']
-        sync_result = self._process_sync()
-        sync_result['raw_events'] = self._raw_events
+
+        sync_result = GoogleCalendarSyncResult(self._raw_events)
+        self._process_sync(sync_result)
         return sync_result

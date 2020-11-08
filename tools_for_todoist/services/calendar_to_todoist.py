@@ -160,22 +160,37 @@ class CalendarToTodoistService:
         item = self._create_todoist_item(calendar_event)
         return calendar_event, item
 
+    def _process_merged_event(self, calendar_event):
+        todoist_id = _todoist_id(calendar_event)
+
+        if todoist_id is None:
+            return
+        todoist_item = self.todoist.get_item_by_id(todoist_id)
+        if todoist_item is None:
+            return
+
+        logger.info(f'Merging Event| {calendar_event}')
+        self.todoist.archive_item(todoist_item)
+
     def _google_calendar_sync(self):
         sync_result = self.google_calendar.sync()
         new_event_item_links = []
 
-        for calendar_event in sync_result['created']:
+        for calendar_event in sync_result.created_events:
             new_event_item_link = self._process_new_event(calendar_event)
             if new_event_item_link is not None:
                 new_event_item_links.append(new_event_item_link)
 
-        for calendar_event in sync_result['cancelled']:
+        for calendar_event in sync_result.cancelled_events:
             self._process_cancelled_event(calendar_event)
 
-        for old_calendar_event, calendar_event in sync_result['updated']:
+        for old_calendar_event, calendar_event in sync_result.updated_events:
             new_event_item_link = self._process_updated_event(old_calendar_event, calendar_event)
             if new_event_item_link is not None:
                 new_event_item_links.append(new_event_item_link)
+
+        for calendar_event in sync_result.merged_event_instances:
+            self._process_merged_event(calendar_event)
 
         return sync_result, new_event_item_links
 
