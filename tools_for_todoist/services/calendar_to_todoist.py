@@ -51,8 +51,10 @@ def _todoist_title(calendar_event):
     return f'[{title}]({calendar_event.html_link()})'
 
 
-def _next_occurrence(calendar_event):
-    last_completed = parse(calendar_event.get_private_info(CALENDAR_LAST_COMPLETED))
+def _next_occurrence(calendar_event, last_completed_source=None):
+    last_completed = parse(
+        (last_completed_source or calendar_event).get_private_info(CALENDAR_LAST_COMPLETED)
+    )
     return calendar_event.next_occurrence(last_completed)
 
 
@@ -84,6 +86,21 @@ class CalendarToTodoistService:
         item.save()
         return item
 
+    def _ensure_last_completed(self, calendar_event, todoist_item):
+        if calendar_event.get_private_info(CALENDAR_LAST_COMPLETED) is not None:
+            return
+
+        now = datetime.now(gettz(self.google_calendar.default_timezone))
+        default_last_completed = (
+            (now.date() - timedelta(1))
+            if is_allday(calendar_event.start())
+            else now.astimezone(UTC)
+        )
+        calendar_event.save_private_info(CALENDAR_LAST_COMPLETED, default_last_completed)
+        if todoist_item is not None:
+            print('saving default last completed')
+            calendar_event.save()
+
     def _process_new_event(self, calendar_event):
         todoist_id = _todoist_id(calendar_event)
         todoist_item = None
@@ -92,26 +109,13 @@ class CalendarToTodoistService:
             self.item_to_event[todoist_id] = calendar_event
             todoist_item = self.todoist.get_item_by_id(todoist_id)
 
-        if calendar_event.get_private_info(CALENDAR_LAST_COMPLETED) is None:
-            now = datetime.now(gettz(self.google_calendar.default_timezone))
-            default_last_completed = (
-                (now.date() - timedelta(1))
-                if is_allday(calendar_event.start())
-                else now.astimezone(UTC)
-            )
-            calendar_event.save_private_info(CALENDAR_LAST_COMPLETED, default_last_completed)
-            if todoist_item is not None:
-                logger.warning(
-                    f'Linked Event with missing last completion info '
-                    f'{calendar_event} {todoist_item}'
-                )
-                calendar_event.save()
+        self._ensure_last_completed(calendar_event, todoist_item)
 
         if _next_occurrence(calendar_event) is None:
             if todoist_item is None or todoist_item.is_completed():
                 return
 
-            self.todoist.archive_item(todoist_item)
+            todoist_item.archive()
             return None
 
         logger.debug(f'Processing new event| {calendar_event}')
@@ -136,23 +140,22 @@ class CalendarToTodoistService:
         todoist_id = _todoist_id(calendar_event)
 
         if todoist_id is None:
-            return None
+            return self._process_new_event(calendar_event)
         todoist_item = self.todoist.get_item_by_id(todoist_id)
 
         if _next_occurrence(calendar_event) is None:
             if todoist_item is not None and not todoist_item.is_completed():
-                self.todoist.archive_item(todoist_item)
+                todoist_item.archive()
             return None
 
+        logger.debug(f'Updating event| old:{old_calendar_event} new:{calendar_event}')
         if (
             todoist_item is not None
             and todoist_item.is_completed()
-            and old_calendar_event is not None
-            and _next_occurrence(old_calendar_event) is None
+            and _next_occurrence(old_calendar_event, last_completed_source=calendar_event) is None
         ):
-            self.todoist.uncomplete_item(todoist_item)
+            todoist_item.uncomplete()
 
-        logger.debug(f'Updating event| old:{old_calendar_event} new:{calendar_event}')
         if todoist_item is not None:
             _update_todoist_item(todoist_item, calendar_event)
             return None
@@ -165,12 +168,13 @@ class CalendarToTodoistService:
 
         if todoist_id is None:
             return
+
         todoist_item = self.todoist.get_item_by_id(todoist_id)
         if todoist_item is None:
             return
 
         logger.info(f'Merging Event| {calendar_event}')
-        self.todoist.archive_item(todoist_item)
+        todoist_item.archive()
 
     def _google_calendar_sync(self):
         sync_result = self.google_calendar.sync()
@@ -225,7 +229,7 @@ class CalendarToTodoistService:
                 calendar_event.save_private_info(CALENDAR_LAST_COMPLETED, current_completed)
                 calendar_event.save()
 
-                if not item.is_completed():
+                if not item.is_completed() and _next_occurrence(calendar_event) is not None:
                     should_sync |= _update_todoist_item(item, calendar_event)
             sync_results.append(sync_result)
         return sync_results

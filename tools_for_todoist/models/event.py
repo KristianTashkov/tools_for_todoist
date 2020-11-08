@@ -86,6 +86,12 @@ class CalendarEvent:
         event.update_from_raw(raw)
         return event
 
+    def deep_copy(self):
+        event = CalendarEvent.from_raw(self.google_calendar, self._raw)
+        for event_instance in self.exceptions.values():
+            event.update_exception(event_instance.raw())
+        return event
+
     def update_from_raw(self, raw):
         self._raw = copy.deepcopy(raw)
         self._extended_properties = self._raw.get('extendedProperties')

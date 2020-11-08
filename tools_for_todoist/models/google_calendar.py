@@ -68,13 +68,13 @@ def _do_auth():
 
 class GoogleCalendarSyncResult:
     def __init__(self, raw_results):
+        self.raw_results = raw_results
         self.created_events = []
         self.created_events_ids = set()
         self.cancelled_events = []
+        self.cancelled_events_ids = set()
         self.updated_events = []
         self.updated_events_ids = set()
-        self.cancelled_events_ids = set()
-        self.raw_results = raw_results
         self.merged_event_instances = []
 
 
@@ -116,7 +116,7 @@ class GoogleCalendar:
 
         else:
             event_model = self._events[raw_event['id']]
-            old_event_copy = CalendarEvent.from_raw(self, event_model.raw())
+            old_event_copy = event_model.deep_copy()
             event_model.update_from_raw(raw_event)
             sync_result.updated_events.append((old_event_copy, event_model))
             sync_result.updated_events_ids.add(raw_event['id'])
@@ -140,13 +140,14 @@ class GoogleCalendar:
                 continue
 
             recurring_event = self._events[recurring_event_id]
+            old_event_copy = recurring_event.deep_copy()
             recurring_event.update_exception(raw_event)
             # TODO(daniel): Implement this properly
             if (
                 recurring_event_id not in sync_result.updated_events_ids
                 and recurring_event_id not in sync_result.created_events_ids
             ):
-                sync_result.updated_events.append((None, recurring_event))
+                sync_result.updated_events.append((old_event_copy, recurring_event))
                 sync_result.updated_events_ids.add(recurring_event_id)
 
     def get_event_by_id(self, event_id):

@@ -34,6 +34,7 @@ class TodoistItem:
         self.priority = 1
         self._due = None
         self._raw = None
+        self._in_history = False
         self._labels = set()
 
     def raw(self):
@@ -51,6 +52,7 @@ class TodoistItem:
         self.content = self._raw['content']
         self.priority = self._raw['priority']
         self._due = self._raw['due']
+        self._in_history = self._raw['in_history']
         self.project_id = self._raw['project_id']
         self._labels = set(self._raw['labels'])
 
@@ -98,7 +100,7 @@ class TodoistItem:
     def is_completed(self):
         if self.id == -1:
             return False
-        return self._raw.get('in_history', False)
+        return self._in_history
 
     def has_parent(self):
         return self._raw.get('parent_id') is not None
@@ -108,6 +110,14 @@ class TodoistItem:
 
     def add_label(self, label_id):
         self._labels.add(label_id)
+
+    def uncomplete(self):
+        self._in_history = False
+        self.todoist.uncomplete_item(self)
+
+    def archive(self):
+        self._in_history = True
+        self.todoist.archive_item(self)
 
     def save(self):
         if self.id == -1:

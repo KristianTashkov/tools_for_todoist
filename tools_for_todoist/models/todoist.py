@@ -163,7 +163,6 @@ class Todoist:
                 return self.api.commit()
             return self.api.sync()
 
-        new_completed = self._new_completed()
         result = retry_flaky_function(
             api_sync,
             'todoist_api_sync',
@@ -187,5 +186,5 @@ class Todoist:
             logger.exception('Todoist Sync Failed| {result}', exc_info=e)
             raise
         sync_result['raw'] = result
-        sync_result['completed'] = new_completed
+        sync_result['completed'] = self._new_completed()
         return sync_result
