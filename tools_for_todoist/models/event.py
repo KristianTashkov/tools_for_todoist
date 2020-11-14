@@ -149,7 +149,7 @@ class CalendarEvent:
         non_cancelled_exception_starts = (
             x.start()
             for x in self.exceptions.values()
-            if not (x._get_is_cancelled() or x.is_declined_by_me() or x.is_declined_by_others())
+            if not (x._is_cancelled() or x.is_declined_by_me() or x.is_declined_by_others())
         )
         future_exception_starts = (
             start for start in non_cancelled_exception_starts if start > after_dt
@@ -234,7 +234,7 @@ class CalendarEvent:
         if updated_fields:
             self.google_calendar.update_event(self._id, updated_fields)
 
-    def _get_is_cancelled(self):
+    def _is_cancelled(self):
         return self._raw['status'] == 'cancelled'
 
     def is_declined_by_me(self):
@@ -248,6 +248,8 @@ class CalendarEvent:
         return len(other_attendees) > 0 and all_declined
 
     def __repr__(self):
-        if self._get_is_cancelled():
-            return f"{self._id}: {self._raw['originalStartTime']} cancelled"
-        return f"{self._id}: {self.summary}, {self.start()}, {self._raw.get('recurrence')}"
+        cancelled_tag = 'cancelled|' if self._is_cancelled() else ''
+        return (
+            f"{self._id}: {cancelled_tag}{self.summary}, {self.start()}, "
+            f"{self._raw.get('recurrence')}"
+        )

@@ -128,13 +128,15 @@ class CalendarToTodoistService:
         return calendar_event, item
 
     def _process_cancelled_event(self, calendar_event):
-        logger.debug(f'Canceling event| {calendar_event}')
         todoist_id = _todoist_id(calendar_event)
+        if todoist_id is None:
+            return
+        todoist_item = self.todoist.get_item_by_id(todoist_id)
+        if todoist_item is None:
+            return
 
-        if todoist_id is not None:
-            todoist_item = self.todoist.get_item_by_id(todoist_id)
-            if todoist_item is not None:
-                self.todoist.delete_item(todoist_item)
+        logger.debug(f'Canceling event| {calendar_event}')
+        self.todoist.delete_item(todoist_item)
 
     def _process_updated_event(self, old_calendar_event, calendar_event):
         todoist_id = _todoist_id(calendar_event)

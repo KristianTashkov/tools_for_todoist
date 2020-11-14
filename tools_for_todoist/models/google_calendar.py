@@ -97,8 +97,9 @@ class GoogleCalendar:
     def _process_raw_event(self, raw_event, sync_result):
         if raw_event['status'] == 'cancelled':
             canceled_event = self._events.pop(raw_event['id'], None)
-            if canceled_event is not None:
-                sync_result.cancelled_events.append(canceled_event)
+            sync_result.cancelled_events.append(
+                canceled_event or CalendarEvent.from_raw(self, raw_event)
+            )
             sync_result.cancelled_events_ids.add(raw_event['id'])
         elif raw_event['id'] not in self._events:
             new_event = CalendarEvent.from_raw(self, raw_event)
@@ -159,7 +160,9 @@ class GoogleCalendar:
         ).execute()
 
     def sync(self):
-        request = self.api.events().list(calendarId=self._calendar_id, syncToken=self.sync_token)
+        request = self.api.events().list(
+            calendarId=self._calendar_id, syncToken=self.sync_token, showDeleted=True
+        )
         response = None
 
         self._raw_events = []
