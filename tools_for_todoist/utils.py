@@ -54,7 +54,7 @@ def to_todoist_date(dt):
     if dt.tzinfo is None:
         return dt.isoformat(), None
 
-    timezone = re.search(r'.*/(.*/.*)', dt.tzinfo._filename).groups()[0]
+    timezone = re.search(r'.*/(.*/.*)', dt.tzinfo._filename)[1]
     return dt.astimezone(UTC).isoformat().replace('+00:00', 'Z'), timezone
 
 

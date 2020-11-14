@@ -56,7 +56,7 @@ class CalendarEvent:
                 match = re.search(until_matcher, recurrence_line)
                 if match:
                     new_end = (
-                        parse(match.groups()[0])
+                        parse(match[1])
                         .astimezone(gettz(self.google_calendar.default_timezone))
                         .date()
                     )
@@ -121,12 +121,14 @@ class CalendarEvent:
             return None
         return self._extended_properties.get('private', {}).get(key)
 
+    def _get_timezone(self, raw_start):
+        return gettz(raw_start.get('timeZone', self.google_calendar.default_timezone))
+
     def _parse_start(self, raw_start):
         if 'date' in raw_start:
             return parse(raw_start['date']).date()
         dt = parse(raw_start['dateTime'])
-        time_zone = raw_start.get('timeZone', self.google_calendar.default_timezone)
-        return dt.astimezone(gettz(time_zone))
+        return dt.astimezone(self._get_timezone(raw_start))
 
     def start(self):
         return self._parse_start(self._raw['start'])
@@ -200,7 +202,9 @@ class CalendarEvent:
         formatted = rrule_to_string(rrule)
         match = re.search(r'until (.*Z|[\d]{8})', formatted)
         if match is not None:
-            until_date = parse(match.groups()[0])
+            until_date = parse(match[1])
+            if 'Z' in match[0]:
+                until_date = until_date.astimezone(self._get_timezone(self._raw['start']))
 
             formatted = (
                 f'{formatted[:match.span()[0]]}'

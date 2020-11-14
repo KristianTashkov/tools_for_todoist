@@ -19,7 +19,6 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 from datetime import date, datetime
 from unittest.case import TestCase
 
-import pytest
 from dateutil.tz import gettz
 
 from tools_for_todoist.tests.models.event_builder import EventBuilder
@@ -702,13 +701,19 @@ class CalendarEventTests(TestCase):
         )
         self.assertEqual(event.recurrence_string(), 'every day until 2020-01-20')
 
-    # TODO(hrisi): fix datetime until recurrence
-    @pytest.mark.skip
     def test_until_datetime_recurrence_string(self):
         event = (
             EventBuilder()
-            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
-            .set_rrule('DAILY', until='20200121T085959Z')
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00', timezone='Europe/Zurich')
+            .set_rrule('DAILY', until='20200120T225959Z')
+            .create_event()
+        )
+        self.assertEqual(event.recurrence_string(), 'every day at 10:10 until 2020-01-20')
+
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00-05:00', timezone='America/New York')
+            .set_rrule('DAILY', until='20200121T045959Z')
             .create_event()
         )
         self.assertEqual(event.recurrence_string(), 'every day at 10:10 until 2020-01-20')

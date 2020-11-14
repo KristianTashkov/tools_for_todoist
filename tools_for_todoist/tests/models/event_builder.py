@@ -22,8 +22,8 @@ from tools_for_todoist.models.event import CalendarEvent
 
 
 class MockGoogleCalendar:
-    def __init__(self):
-        self.default_timezone = 'Europe/Zurich'
+    def __init__(self, default_timezone=None):
+        self.default_timezone = 'Europe/Zurich' if default_timezone is None else default_timezone
 
     def update_event(self, event_id, update_data):
         pass
