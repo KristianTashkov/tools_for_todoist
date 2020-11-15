@@ -101,8 +101,11 @@ class EventBuilder:
         self._raw['status'] = status
         return self
 
-    def add_attendee(self, *, is_self=False, status='accepted'):
+    def add_attendee(self, *, is_self=False, status='accepted', resource=None):
         if 'attendees' not in self._raw:
             self._raw['attendees'] = []
-        self._raw['attendees'].append({'self': is_self, 'responseStatus': status})
+        new_attendee = {'self': is_self, 'responseStatus': status}
+        if resource is not None:
+            new_attendee['resource'] = True
+        self._raw['attendees'].append(new_attendee)
         return self

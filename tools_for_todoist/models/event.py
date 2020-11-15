@@ -247,7 +247,11 @@ class CalendarEvent:
         return self_response is not None and self_response['responseStatus'] == 'declined'
 
     def is_declined_by_others(self):
-        other_attendees = [x for x in self._raw.get('attendees', []) if not x.get('self', False)]
+        other_attendees = [
+            x
+            for x in self._raw.get('attendees', [])
+            if not x.get('self', False) and not x.get('resource', False)
+        ]
         all_declined = all([x['responseStatus'] == 'declined' for x in other_attendees])
         return len(other_attendees) > 0 and all_declined
 

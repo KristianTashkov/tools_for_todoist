@@ -320,6 +320,7 @@ class CalendarEventTests(TestCase):
             .set_rrule('WEEKLY')
             .add_attendee(is_self=True, status='accepted')
             .add_attendee(is_self=False, status='declined')
+            .add_attendee(is_self=False, status='accepted', resource=True)
             .create_event()
         )
 
@@ -340,6 +341,7 @@ class CalendarEventTests(TestCase):
             .add_attendee(is_self=True, status='accepted')
             .add_attendee(is_self=False, status='declined')
             .add_attendee(is_self=False, status='accepted')
+            .add_attendee(is_self=False, status='declined', resource=False)
             .create_event()
         )
         next_event = datetime(
