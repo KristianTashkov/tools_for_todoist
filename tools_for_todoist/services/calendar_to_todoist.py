@@ -65,6 +65,15 @@ class CalendarToTodoistService:
         self.google_calendar = GoogleCalendar()
         self.item_to_event = {}
 
+    def _set_default_last_completed(self, calendar_event):
+        now = datetime.now(gettz(self.google_calendar.default_timezone))
+        default_last_completed = (
+            (now.date() - timedelta(1))
+            if is_allday(calendar_event.start())
+            else now.astimezone(UTC)
+        )
+        calendar_event.save_private_info(CALENDAR_LAST_COMPLETED, default_last_completed)
+
     def _update_todoist_item(self, todoist_item, calendar_event):
         if todoist_item.is_completed():
             return False
@@ -110,13 +119,7 @@ class CalendarToTodoistService:
         if calendar_event.get_private_info(CALENDAR_LAST_COMPLETED) is not None:
             return
 
-        now = datetime.now(gettz(self.google_calendar.default_timezone))
-        default_last_completed = (
-            (now.date() - timedelta(1))
-            if is_allday(calendar_event.start())
-            else now.astimezone(UTC)
-        )
-        calendar_event.save_private_info(CALENDAR_LAST_COMPLETED, default_last_completed)
+        self._set_default_last_completed(calendar_event)
         if todoist_item is not None:
             print('saving default last completed')
             calendar_event.save()
@@ -249,6 +252,17 @@ class CalendarToTodoistService:
             return False
         return self._update_todoist_item(item, calendar_event)
 
+    def _process_updated_item(self, old, new):
+        calendar_event = self.item_to_event.get(new.id)
+        if calendar_event is None:
+            return False
+        if new.next_due_date() is not None:
+            return False
+
+        self._set_default_last_completed(calendar_event)
+        calendar_event.save()
+        return self._update_todoist_item(new, calendar_event)
+
     def _todoist_sync(self):
         should_sync = True
         sync_results = []
@@ -258,6 +272,8 @@ class CalendarToTodoistService:
 
             for item_id in sync_result['completed']:
                 should_sync |= self._process_completed_item(item_id)
+            for old, new in sync_result['updated']:
+                should_sync |= self._process_updated_item(old, new)
             sync_results.append(sync_result)
         return sync_results
 
