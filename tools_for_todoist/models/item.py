@@ -111,6 +111,9 @@ class TodoistItem:
     def add_label(self, label_id):
         self._labels.add(label_id)
 
+    def remove_label(self, label_id):
+        self._labels.discard(label_id)
+
     def uncomplete(self):
         self._in_history = False
         self.todoist.uncomplete_item(self)

@@ -246,9 +246,7 @@ class CalendarEvent:
         return self._raw['status'] == 'cancelled'
 
     def is_declined_by_me(self):
-        attendees = self._raw.get('attendees', [])
-        self_response = next((x for x in attendees if x.get('self', False)), None)
-        return self_response is not None and self_response['responseStatus'] == 'declined'
+        return self.response_status() == 'declined'
 
     def is_declined_by_others(self):
         other_attendees = [
@@ -258,6 +256,11 @@ class CalendarEvent:
         ]
         all_declined = all([x['responseStatus'] == 'declined' for x in other_attendees])
         return len(other_attendees) > 0 and all_declined
+
+    def response_status(self):
+        attendees = self._raw.get('attendees', [])
+        self_attendee = next((x for x in attendees if x.get('self', False)), None)
+        return self_attendee['responseStatus'] if self_attendee is not None else None
 
     def __repr__(self):
         cancelled_tag = 'cancelled|' if self._is_cancelled() else ''

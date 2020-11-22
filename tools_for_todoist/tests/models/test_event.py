@@ -798,3 +798,12 @@ class CalendarEventTests(TestCase):
         expected_exception = event.exceptions[event_exception.id()]
         self.assertEqual(event.next_occurrence(before_event), (next_event, expected_exception))
         self.assertEqual(expected_exception.summary, 'changed title')
+
+    def test_response_status(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .add_attendee(is_self=True, status='some status')
+            .create_event()
+        )
+        self.assertEqual(event.response_status(), 'some status')

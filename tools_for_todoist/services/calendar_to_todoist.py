@@ -35,6 +35,7 @@ CALENDAR_EVENT_TODOIST_KEY = 'todoist_item_id'
 CALENDAR_EVENT_ID = 'calendar_event_id'
 CALENDAR_LAST_COMPLETED = 'last_completed'
 CALENDAR_TO_TODOIST_LABEL = 'calendar_to_todoist.label'
+CALENDAR_TO_TODOIST_NEEDS_ACTION_LABEL = 'calendar_to_todoist.needs_action_label'
 
 
 def _todoist_id(calendar_event):
@@ -58,32 +59,48 @@ def _next_occurrence(calendar_event, last_completed_source=None):
     return calendar_event.next_occurrence(last_completed)
 
 
-def _update_todoist_item(todoist_item, calendar_event):
-    if todoist_item.is_completed():
-        return False
-
-    next_occurrence, event_source = _next_occurrence(calendar_event)
-    todoist_item.content = _todoist_title(event_source)
-    todoist_item.set_due(next_occurrence, calendar_event.recurrence_string())
-    return todoist_item.save()
-
-
 class CalendarToTodoistService:
     def __init__(self):
         self.todoist = Todoist()
         self.google_calendar = GoogleCalendar()
         self.item_to_event = {}
 
+    def _update_todoist_item(self, todoist_item, calendar_event):
+        if todoist_item.is_completed():
+            return False
+
+        next_occurrence, event_source = _next_occurrence(calendar_event)
+        todoist_item.content = _todoist_title(event_source)
+        todoist_item.set_due(next_occurrence, calendar_event.recurrence_string())
+        self._handle_needs_action_label(event_source, todoist_item)
+        return todoist_item.save()
+
+    def _handle_needs_action_label(self, calendar_event, item):
+        label_name = get_storage().get_value(CALENDAR_TO_TODOIST_NEEDS_ACTION_LABEL)
+        if label_name is None:
+            return
+
+        needs_action_label_id = self.todoist.get_label_id_by_name(label_name)
+        if needs_action_label_id is None:
+            needs_action_label_id = self.todoist.create_label(label_name)
+
+        if calendar_event.response_status() == 'needsAction':
+            item.add_label(needs_action_label_id)
+        else:
+            item.remove_label(needs_action_label_id)
+
     def _create_todoist_item(self, calendar_event):
         next_occurrence, event_source = _next_occurrence(calendar_event)
         todoist_title = _todoist_title(event_source)
         item = TodoistItem(self.todoist, todoist_title, self.todoist.active_project_id)
+
         label_name = get_storage().get_value(CALENDAR_TO_TODOIST_LABEL)
         if label_name:
             calendar_label_id = self.todoist.get_label_id_by_name(label_name)
             if calendar_label_id is None:
                 calendar_label_id = self.todoist.create_label(label_name)
             item.add_label(calendar_label_id)
+        self._handle_needs_action_label(event_source, item)
 
         item.set_due(next_occurrence, calendar_event.recurrence_string())
         item.save()
@@ -124,7 +141,7 @@ class CalendarToTodoistService:
         logger.debug(f'Processing new event| {calendar_event}')
         calendar_id = calendar_event.get_private_info(CALENDAR_EVENT_ID)
         if todoist_item is not None and calendar_id == calendar_event.id():
-            _update_todoist_item(todoist_item, calendar_event)
+            self._update_todoist_item(todoist_item, calendar_event)
             return None
 
         item = self._create_todoist_item(calendar_event)
@@ -163,7 +180,7 @@ class CalendarToTodoistService:
             todoist_item.uncomplete()
 
         if todoist_item is not None:
-            _update_todoist_item(todoist_item, calendar_event)
+            self._update_todoist_item(todoist_item, calendar_event)
             return None
 
         item = self._create_todoist_item(calendar_event)
@@ -230,7 +247,7 @@ class CalendarToTodoistService:
 
         if item.is_completed() or _next_occurrence(calendar_event)[0] is None:
             return False
-        return _update_todoist_item(item, calendar_event)
+        return self._update_todoist_item(item, calendar_event)
 
     def _todoist_sync(self):
         should_sync = True
