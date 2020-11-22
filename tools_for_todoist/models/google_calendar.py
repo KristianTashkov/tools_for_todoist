@@ -114,7 +114,6 @@ class GoogleCalendar:
                 for single_exception in single_exceptions:
                     new_event.update_exception(single_exception.raw())
                     sync_result.merged_event_instances.append(single_exception)
-
         else:
             event_model = self._events[raw_event['id']]
             old_event_copy = event_model.deep_copy()

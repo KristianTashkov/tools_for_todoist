@@ -200,6 +200,34 @@ class CalendarToTodoistService:
 
         return sync_result, new_event_item_links
 
+    def _process_completed_item(self, item_id):
+        item = self.todoist.get_item_by_id(item_id)
+        item_info = item if item is not None else f'Deleted item {item_id}'
+
+        logger.info(f'Completed Item| {item_info}')
+        if item is None or item.has_parent():
+            return False
+
+        calendar_event = self.item_to_event.get(item_id)
+        if calendar_event is None:
+            logger.warning(f'Link to calendar event missing for {item}')
+            return False
+
+        current_completed = _next_occurrence(calendar_event)
+        if current_completed is None:
+            logger.warning(f'Completion for {item} without next viable occurrence')
+            return False
+
+        if not is_allday(current_completed):
+            current_completed = current_completed.astimezone(UTC)
+
+        calendar_event.save_private_info(CALENDAR_LAST_COMPLETED, current_completed)
+        calendar_event.save()
+
+        if item.is_completed() or _next_occurrence(calendar_event) is None:
+            return False
+        return _update_todoist_item(item, calendar_event)
+
     def _todoist_sync(self):
         should_sync = True
         sync_results = []
@@ -208,31 +236,7 @@ class CalendarToTodoistService:
             should_sync = False
 
             for item_id in sync_result['completed']:
-                item = self.todoist.get_item_by_id(item_id)
-                item_info = item if item is not None else f'Deleted item {item_id}'
-
-                logger.info(f'Completed Item| {item_info}')
-                if item is None or item.has_parent():
-                    continue
-
-                calendar_event = self.item_to_event.get(item_id)
-                if calendar_event is None:
-                    logger.warning(f'Link to calendar event missing for {item}')
-                    continue
-
-                current_completed = _next_occurrence(calendar_event)
-                if current_completed is None:
-                    logger.warning(f'Completion for {item} without next viable occurrence')
-                    continue
-
-                if not is_allday(current_completed):
-                    current_completed = current_completed.astimezone(UTC)
-
-                calendar_event.save_private_info(CALENDAR_LAST_COMPLETED, current_completed)
-                calendar_event.save()
-
-                if not item.is_completed() and _next_occurrence(calendar_event) is not None:
-                    should_sync |= _update_todoist_item(item, calendar_event)
+                should_sync |= self._process_completed_item(item_id)
             sync_results.append(sync_result)
         return sync_results
 
