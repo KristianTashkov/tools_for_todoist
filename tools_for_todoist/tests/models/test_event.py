@@ -94,11 +94,13 @@ class CalendarEventTests(TestCase):
         event = EventBuilder().set_start_date(date='2020-01-10').create_event()
 
         before_event = date(year=2020, month=1, day=9)
-        self.assertEqual(event.next_occurrence(before_event), date(year=2020, month=1, day=10))
+        self.assertEqual(
+            event.next_occurrence(before_event), (date(year=2020, month=1, day=10), event)
+        )
         exact_event = date(year=2020, month=1, day=10)
-        self.assertEqual(event.next_occurrence(exact_event), None)
+        self.assertEqual(event.next_occurrence(exact_event), (None, None))
         after_event = date(year=2020, month=1, day=11)
-        self.assertEqual(event.next_occurrence(after_event), None)
+        self.assertEqual(event.next_occurrence(after_event), (None, None))
 
     def test_single_datetime_next_occurrence(self):
         event = EventBuilder().set_start_date(datetime='2020-01-01T10:10:00+01:00').create_event()
@@ -113,25 +115,31 @@ class CalendarEventTests(TestCase):
         default_timezone = event.google_calendar.default_timezone
 
         before_event = datetime(year=2020, month=1, day=1, hour=9, tzinfo=gettz(default_timezone))
-        self.assertEqual(event.next_occurrence(before_event), expected_start)
+        self.assertEqual(event.next_occurrence(before_event), (expected_start, event))
         exact_event = datetime(
             year=2020, month=1, day=1, hour=10, minute=10, tzinfo=gettz(default_timezone)
         )
-        self.assertEqual(event.next_occurrence(exact_event), None)
+        self.assertEqual(event.next_occurrence(exact_event), (None, None))
         after_event = event.next_occurrence(
             datetime(year=2020, month=1, day=1, hour=11, tzinfo=gettz(default_timezone))
         )
-        self.assertEqual(after_event, None)
+        self.assertEqual(after_event, (None, None))
 
     def test_recurring_all_day_next_occurrence(self):
         event = EventBuilder().set_start_date(date='2020-01-10').set_rrule('DAILY').create_event()
 
         before_event = date(year=2020, month=1, day=1)
-        self.assertEqual(event.next_occurrence(before_event), date(year=2020, month=1, day=10))
+        self.assertEqual(
+            event.next_occurrence(before_event), (date(year=2020, month=1, day=10), event)
+        )
         exact_event = date(year=2020, month=1, day=10)
-        self.assertEqual(event.next_occurrence(exact_event), date(year=2020, month=1, day=11))
+        self.assertEqual(
+            event.next_occurrence(exact_event), (date(year=2020, month=1, day=11), event)
+        )
         after_event = date(year=2020, month=1, day=11)
-        self.assertEqual(event.next_occurrence(after_event), date(year=2020, month=1, day=12))
+        self.assertEqual(
+            event.next_occurrence(after_event), (date(year=2020, month=1, day=12), event)
+        )
 
     def test_ending_recurring_all_day_next_occurrence(self):
         event = (
@@ -142,15 +150,21 @@ class CalendarEventTests(TestCase):
         )
 
         before_event = date(year=2020, month=1, day=1)
-        self.assertEqual(event.next_occurrence(before_event), date(year=2020, month=1, day=10))
+        self.assertEqual(
+            event.next_occurrence(before_event), (date(year=2020, month=1, day=10), event)
+        )
         exact_event = date(year=2020, month=1, day=10)
-        self.assertEqual(event.next_occurrence(exact_event), date(year=2020, month=1, day=11))
+        self.assertEqual(
+            event.next_occurrence(exact_event), (date(year=2020, month=1, day=11), event)
+        )
         last_event = date(year=2020, month=1, day=19)
-        self.assertEqual(event.next_occurrence(last_event), date(year=2020, month=1, day=20))
+        self.assertEqual(
+            event.next_occurrence(last_event), (date(year=2020, month=1, day=20), event)
+        )
         exact_ending = date(year=2020, month=1, day=20)
-        self.assertEqual(event.next_occurrence(exact_ending), None)
+        self.assertEqual(event.next_occurrence(exact_ending), (None, None))
         after_ending = date(year=2020, month=1, day=21)
-        self.assertEqual(event.next_occurrence(after_ending), None)
+        self.assertEqual(event.next_occurrence(after_ending), (None, None))
 
     def test_ending_utc_recurring_all_day_next_occurrence(self):
         event = (
@@ -161,15 +175,21 @@ class CalendarEventTests(TestCase):
         )
 
         before_event = date(year=2020, month=1, day=1)
-        self.assertEqual(event.next_occurrence(before_event), date(year=2020, month=1, day=10))
+        self.assertEqual(
+            event.next_occurrence(before_event), (date(year=2020, month=1, day=10), event)
+        )
         exact_event = date(year=2020, month=1, day=10)
-        self.assertEqual(event.next_occurrence(exact_event), date(year=2020, month=1, day=11))
+        self.assertEqual(
+            event.next_occurrence(exact_event), (date(year=2020, month=1, day=11), event)
+        )
         last_event = date(year=2020, month=1, day=19)
-        self.assertEqual(event.next_occurrence(last_event), date(year=2020, month=1, day=20))
+        self.assertEqual(
+            event.next_occurrence(last_event), (date(year=2020, month=1, day=20), event)
+        )
         exact_ending = date(year=2020, month=1, day=20)
-        self.assertEqual(event.next_occurrence(exact_ending), None)
+        self.assertEqual(event.next_occurrence(exact_ending), (None, None))
         after_ending = date(year=2020, month=1, day=21)
-        self.assertEqual(event.next_occurrence(after_ending), None)
+        self.assertEqual(event.next_occurrence(after_ending), (None, None))
 
     def test_ending_count_recurring_all_day_next_occurrence(self):
         event = (
@@ -180,15 +200,21 @@ class CalendarEventTests(TestCase):
         )
 
         before_event = date(year=2020, month=1, day=1)
-        self.assertEqual(event.next_occurrence(before_event), date(year=2020, month=1, day=10))
+        self.assertEqual(
+            event.next_occurrence(before_event), (date(year=2020, month=1, day=10), event)
+        )
         exact_event = date(year=2020, month=1, day=10)
-        self.assertEqual(event.next_occurrence(exact_event), date(year=2020, month=1, day=11))
+        self.assertEqual(
+            event.next_occurrence(exact_event), (date(year=2020, month=1, day=11), event)
+        )
         last_event = date(year=2020, month=1, day=19)
-        self.assertEqual(event.next_occurrence(last_event), date(year=2020, month=1, day=20))
+        self.assertEqual(
+            event.next_occurrence(last_event), (date(year=2020, month=1, day=20), event)
+        )
         exact_ending = date(year=2020, month=1, day=20)
-        self.assertEqual(event.next_occurrence(exact_ending), None)
+        self.assertEqual(event.next_occurrence(exact_ending), (None, None))
         after_ending = date(year=2020, month=1, day=21)
-        self.assertEqual(event.next_occurrence(after_ending), None)
+        self.assertEqual(event.next_occurrence(after_ending), (None, None))
 
     def test_recurring_next_occurrence(self):
         event = (
@@ -214,13 +240,13 @@ class CalendarEventTests(TestCase):
             minute=10,
             tzinfo=gettz(event.google_calendar.default_timezone),
         )
-        self.assertEqual(event.next_occurrence(before_event), expected_start)
+        self.assertEqual(event.next_occurrence(before_event), (expected_start, event))
         exact_event = before_event.replace(day=10)
         expected_start = expected_start.replace(day=11)
-        self.assertEqual(event.next_occurrence(exact_event), expected_start)
+        self.assertEqual(event.next_occurrence(exact_event), (expected_start, event))
         after_event = exact_event.replace(day=11)
         expected_start = expected_start.replace(day=12)
-        self.assertEqual(event.next_occurrence(after_event), expected_start)
+        self.assertEqual(event.next_occurrence(after_event), (expected_start, event))
 
     def test_recurring_ending_date_next_occurrence(self):
         event = (
@@ -246,17 +272,17 @@ class CalendarEventTests(TestCase):
             minute=10,
             tzinfo=gettz(event.google_calendar.default_timezone),
         )
-        self.assertEqual(event.next_occurrence(before_event), expected_start)
+        self.assertEqual(event.next_occurrence(before_event), (expected_start, event))
         exact_event = before_event.replace(day=10)
         expected_start = expected_start.replace(day=11)
-        self.assertEqual(event.next_occurrence(exact_event), expected_start)
+        self.assertEqual(event.next_occurrence(exact_event), (expected_start, event))
         last_event = exact_event.replace(day=19)
         expected_start = expected_start.replace(day=20)
-        self.assertEqual(event.next_occurrence(last_event), expected_start)
+        self.assertEqual(event.next_occurrence(last_event), (expected_start, event))
         exact_ending = last_event.replace(day=20)
-        self.assertEqual(event.next_occurrence(exact_ending), None)
+        self.assertEqual(event.next_occurrence(exact_ending), (None, None))
         after_ending = exact_ending.replace(day=21)
-        self.assertEqual(event.next_occurrence(after_ending), None)
+        self.assertEqual(event.next_occurrence(after_ending), (None, None))
 
     def test_recurring_ending_count_next_occurrence(self):
         event = (
@@ -282,17 +308,17 @@ class CalendarEventTests(TestCase):
             minute=10,
             tzinfo=gettz(event.google_calendar.default_timezone),
         )
-        self.assertEqual(event.next_occurrence(before_event), expected_start)
+        self.assertEqual(event.next_occurrence(before_event), (expected_start, event))
         exact_event = before_event.replace(day=10)
         expected_start = expected_start.replace(day=11)
-        self.assertEqual(event.next_occurrence(exact_event), expected_start)
+        self.assertEqual(event.next_occurrence(exact_event), (expected_start, event))
         last_event = exact_event.replace(day=19)
         expected_start = expected_start.replace(day=20)
-        self.assertEqual(event.next_occurrence(last_event), expected_start)
+        self.assertEqual(event.next_occurrence(last_event), (expected_start, event))
         exact_ending = last_event.replace(day=20)
-        self.assertEqual(event.next_occurrence(exact_ending), None)
+        self.assertEqual(event.next_occurrence(exact_ending), (None, None))
         after_ending = exact_ending.replace(day=21)
-        self.assertEqual(event.next_occurrence(after_ending), None)
+        self.assertEqual(event.next_occurrence(after_ending), (None, None))
 
     def test_recurring_declined_next_occurrence(self):
         event = (
@@ -311,7 +337,7 @@ class CalendarEventTests(TestCase):
             minute=10,
             tzinfo=gettz(event.google_calendar.default_timezone),
         )
-        self.assertEqual(event.next_occurrence(before_event), None)
+        self.assertEqual(event.next_occurrence(before_event), (None, None))
 
     def test_recurring_others_declined_next_occurrence(self):
         event = (
@@ -332,7 +358,7 @@ class CalendarEventTests(TestCase):
             minute=10,
             tzinfo=gettz(event.google_calendar.default_timezone),
         )
-        self.assertEqual(event.next_occurrence(before_event), None)
+        self.assertEqual(event.next_occurrence(before_event), (None, None))
 
         event = (
             EventBuilder()
@@ -352,7 +378,7 @@ class CalendarEventTests(TestCase):
             minute=10,
             tzinfo=gettz(event.google_calendar.default_timezone),
         )
-        self.assertEqual(event.next_occurrence(before_event), next_event)
+        self.assertEqual(event.next_occurrence(before_event), (next_event, event))
 
     def test_recurring_others_declined_instance_next_occurrence(self):
         event = (
@@ -388,7 +414,7 @@ class CalendarEventTests(TestCase):
             minute=10,
             tzinfo=gettz(event.google_calendar.default_timezone),
         )
-        self.assertEqual(event.next_occurrence(before_event), next_event)
+        self.assertEqual(event.next_occurrence(before_event), (next_event, event))
 
         event = (
             EventBuilder()
@@ -408,7 +434,10 @@ class CalendarEventTests(TestCase):
         )
         event.update_exception(event_exception.raw())
         next_event = next_event.replace(day=10)
-        self.assertEqual(event.next_occurrence(before_event), next_event)
+        self.assertEqual(
+            event.next_occurrence(before_event),
+            (next_event, event.exceptions[event_exception.id()]),
+        )
 
     def test_recurring_declined_with_accepted_exception_next_occurrence(self):
         event = (
@@ -444,7 +473,10 @@ class CalendarEventTests(TestCase):
             minute=10,
             tzinfo=gettz(event.google_calendar.default_timezone),
         )
-        self.assertEqual(event.next_occurrence(before_event), expected_next)
+        self.assertEqual(
+            event.next_occurrence(before_event),
+            (expected_next, event.exceptions[event_exception.id()]),
+        )
 
     def test_recurring_next_moved_next_occurrence(self):
         event = (
@@ -478,7 +510,10 @@ class CalendarEventTests(TestCase):
             minute=10,
             tzinfo=gettz(event.google_calendar.default_timezone),
         )
-        self.assertEqual(event.next_occurrence(before_event), expected_next)
+        self.assertEqual(
+            event.next_occurrence(before_event),
+            (expected_next, event.exceptions[event_exception.id()]),
+        )
 
     def test_recurring_instances_rearranged_next_occurrence(self):
         event = (
@@ -512,7 +547,10 @@ class CalendarEventTests(TestCase):
             minute=10,
             tzinfo=gettz(event.google_calendar.default_timezone),
         )
-        self.assertEqual(event.next_occurrence(before_event), expected_next)
+        self.assertEqual(
+            event.next_occurrence(before_event),
+            (expected_next, event.exceptions[event_exception.id()]),
+        )
 
     def test_recurring_next_cancelled_next_occurrence(self):
         event = (
@@ -547,12 +585,15 @@ class CalendarEventTests(TestCase):
             minute=10,
             tzinfo=gettz(event.google_calendar.default_timezone),
         )
-        self.assertEqual(event.next_occurrence(before_event), expected_next)
+        self.assertEqual(event.next_occurrence(before_event), (expected_next, event))
 
         event_exception._raw['status'] = 'accepted'
         event.update_exception(event_exception.raw())
         expected_next = expected_next.replace(day=10)
-        self.assertEqual(event.next_occurrence(before_event), expected_next)
+        self.assertEqual(
+            event.next_occurrence(before_event),
+            (expected_next, event.exceptions[event_exception.id()]),
+        )
 
     def test_recurring_next_declined_next_occurrence(self):
         event = (
@@ -587,7 +628,7 @@ class CalendarEventTests(TestCase):
             minute=10,
             tzinfo=gettz(event.google_calendar.default_timezone),
         )
-        self.assertEqual(event.next_occurrence(before_event), expected_next)
+        self.assertEqual(event.next_occurrence(before_event), (expected_next, event))
 
     def test_daily_recurrence_string(self):
         cases = [
@@ -719,3 +760,41 @@ class CalendarEventTests(TestCase):
             .create_event()
         )
         self.assertEqual(event.recurrence_string(), 'every day at 10:10 until 2020-01-20')
+
+    def test_changed_title_exception_next_occurence(self):
+        event = (
+            EventBuilder()
+            .set_title('original title')
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_rrule('WEEKLY')
+            .create_event()
+        )
+        event_exception = (
+            EventBuilder()
+            .set_title('changed title')
+            .set_recurring_event_id(event.id())
+            .set_original_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .set_start_date(datetime='2020-01-10T10:10:00+01:00')
+            .create_event()
+        )
+        event.update_exception(event_exception.raw())
+
+        before_event = datetime(
+            year=2020,
+            month=1,
+            day=1,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        next_event = datetime(
+            year=2020,
+            month=1,
+            day=10,
+            hour=10,
+            minute=10,
+            tzinfo=gettz(event.google_calendar.default_timezone),
+        )
+        expected_exception = event.exceptions[event_exception.id()]
+        self.assertEqual(event.next_occurrence(before_event), (next_event, expected_exception))
+        self.assertEqual(expected_exception.summary, 'changed title')

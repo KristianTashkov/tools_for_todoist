@@ -62,8 +62,9 @@ def _update_todoist_item(todoist_item, calendar_event):
     if todoist_item.is_completed():
         return False
 
-    todoist_item.content = _todoist_title(calendar_event)
-    todoist_item.set_due(_next_occurrence(calendar_event), calendar_event.recurrence_string())
+    next_occurrence, event_source = _next_occurrence(calendar_event)
+    todoist_item.content = _todoist_title(event_source)
+    todoist_item.set_due(next_occurrence, calendar_event.recurrence_string())
     return todoist_item.save()
 
 
@@ -74,7 +75,8 @@ class CalendarToTodoistService:
         self.item_to_event = {}
 
     def _create_todoist_item(self, calendar_event):
-        todoist_title = _todoist_title(calendar_event)
+        next_occurrence, event_source = _next_occurrence(calendar_event)
+        todoist_title = _todoist_title(event_source)
         item = TodoistItem(self.todoist, todoist_title, self.todoist.active_project_id)
         label_name = get_storage().get_value(CALENDAR_TO_TODOIST_LABEL)
         if label_name:
@@ -82,7 +84,8 @@ class CalendarToTodoistService:
             if calendar_label_id is None:
                 calendar_label_id = self.todoist.create_label(label_name)
             item.add_label(calendar_label_id)
-        item.set_due(_next_occurrence(calendar_event), calendar_event.recurrence_string())
+
+        item.set_due(next_occurrence, calendar_event.recurrence_string())
         item.save()
         return item
 
@@ -111,7 +114,7 @@ class CalendarToTodoistService:
 
         self._ensure_last_completed(calendar_event, todoist_item)
 
-        if _next_occurrence(calendar_event) is None:
+        if _next_occurrence(calendar_event)[0] is None:
             if todoist_item is None or todoist_item.is_completed():
                 return
 
@@ -145,7 +148,7 @@ class CalendarToTodoistService:
             return self._process_new_event(calendar_event)
         todoist_item = self.todoist.get_item_by_id(todoist_id)
 
-        if _next_occurrence(calendar_event) is None:
+        if _next_occurrence(calendar_event)[0] is None:
             if todoist_item is not None and not todoist_item.is_completed():
                 todoist_item.archive()
             return None
@@ -154,7 +157,8 @@ class CalendarToTodoistService:
         if (
             todoist_item is not None
             and todoist_item.is_completed()
-            and _next_occurrence(old_calendar_event, last_completed_source=calendar_event) is None
+            and _next_occurrence(old_calendar_event, last_completed_source=calendar_event)[0]
+            is None
         ):
             todoist_item.uncomplete()
 
@@ -213,7 +217,7 @@ class CalendarToTodoistService:
             logger.warning(f'Link to calendar event missing for {item}')
             return False
 
-        current_completed = _next_occurrence(calendar_event)
+        current_completed = _next_occurrence(calendar_event)[0]
         if current_completed is None:
             logger.warning(f'Completion for {item} without next viable occurrence')
             return False
@@ -224,7 +228,7 @@ class CalendarToTodoistService:
         calendar_event.save_private_info(CALENDAR_LAST_COMPLETED, current_completed)
         calendar_event.save()
 
-        if item.is_completed() or _next_occurrence(calendar_event) is None:
+        if item.is_completed() or _next_occurrence(calendar_event)[0] is None:
             return False
         return _update_todoist_item(item, calendar_event)
 

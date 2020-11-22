@@ -148,15 +148,17 @@ class CalendarEvent:
         return last_occurrence.date() if is_allday(start) else last_occurrence
 
     def _find_next_occurrence(self, rrule_instances, after_dt):
-        non_cancelled_exception_starts = (
-            x.start()
+        non_cancelled_exception_starts = [
+            (x.start(), x)
             for x in self.exceptions.values()
             if not (x._is_cancelled() or x.is_declined_by_me() or x.is_declined_by_others())
-        )
+        ]
         future_exception_starts = (
-            start for start in non_cancelled_exception_starts if start > after_dt
+            (start, event) for start, event in non_cancelled_exception_starts if start > after_dt
         )
-        first_exception_start = min(future_exception_starts, default=None)
+        first_exception_start = min(
+            future_exception_starts, default=(None, None), key=lambda x: x[0]
+        )
 
         exception_original_starts = {x._get_original_start() for x in self.exceptions.values()}
         if self.is_declined_by_me() or self.is_declined_by_others():
@@ -164,12 +166,12 @@ class CalendarEvent:
 
         for next_regular_occurrence in rrule_instances.xafter(ensure_datetime(after_dt)):
             if (
-                first_exception_start is not None
-                and first_exception_start < next_regular_occurrence
+                first_exception_start[0] is not None
+                and first_exception_start[0] <= next_regular_occurrence
             ):
                 return first_exception_start
             if next_regular_occurrence not in exception_original_starts:
-                return next_regular_occurrence
+                return next_regular_occurrence, self
         return first_exception_start
 
     def next_occurrence(self, after_dt):
@@ -178,14 +180,16 @@ class CalendarEvent:
         instances = self._get_rrule()
 
         if instances is None:
-            return start if after_dt < start else None
+            return (start, self) if after_dt < start else (None, None)
 
-        next_occurrence = self._find_next_occurrence(instances, after_dt)
-        if next_occurrence is None:
-            return None
-        return (
-            next_occurrence.date() if is_allday(start) else next_occurrence.astimezone(start.tzinfo)
-        )
+        next_occurrence, source_event = self._find_next_occurrence(instances, after_dt)
+        if next_occurrence is not None:
+            next_occurrence = (
+                next_occurrence.date()
+                if is_allday(start)
+                else next_occurrence.astimezone(start.tzinfo)
+            )
+        return next_occurrence, source_event
 
     def recurrence_string(self):
         rrule = self._get_recurrence()
