@@ -17,11 +17,14 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 import copy
+import logging
 
 from dateutil.parser import parse
 from dateutil.tz import gettz
 
 from tools_for_todoist.utils import to_todoist_date
+
+logger = logging.getLogger(__name__)
 
 
 class TodoistItem:
@@ -130,12 +133,18 @@ class TodoistItem:
 
         updated_rows = {}
         if self.content != self._raw['content']:
+            logger.debug(f'{self.id}: updating content: {self._raw["content"]} to {self.content}')
             updated_rows['content'] = self.content
         if self.priority != self._raw['priority']:
+            logger.debug(
+                f'{self.id}: updating priority: {self._raw["priority"]} to {self.priority}'
+            )
             updated_rows['priority'] = self.priority
         if self._due != self._raw['due']:
+            logger.debug(f'{self.id}: updating due: {self._raw["due"]} to {self._due}')
             updated_rows['due'] = self._due
         if self._labels != set(self._raw['labels']):
+            logger.debug(f'{self.id}: updating labels: {self._raw["labels"]} to {self._labels}')
             updated_rows['labels'] = list(self._labels)
         if len(updated_rows) == 0:
             return False
