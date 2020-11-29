@@ -125,6 +125,11 @@ class Todoist:
     def get_label_id_by_name(self, name):
         return next(iter([x['id'] for x in self.api.state['labels'] if x['name'] == name]), None)
 
+    def get_label_name_by_id(self, label_id):
+        return next(
+            iter([x['name'] for x in self.api.state['labels'] if x['id'] == label_id]), None
+        )
+
     def create_label(self, name):
         logger.info(f'Creating label| {name}')
         return self.api.labels.add(name)['id']
@@ -142,7 +147,7 @@ class Todoist:
         return item_raw.data
 
     def update_item(self, item, **kwargs):
-        logger.info(f'Updating item| {item} kwargs:{kwargs}')
+        logger.info(f'Updating item| {item}')
         self.api.items.update(item.id, **kwargs)
 
     def delete_item(self, item):
@@ -158,8 +163,11 @@ class Todoist:
         self.api.items.uncomplete(item.id)
 
     def sync(self):
+        api_queue = self.api.queue
+
         def api_sync():
-            if len(self.api.queue) > 0:
+            if len(api_queue) > 0:
+                self.api.queue = api_queue.copy()
                 return self.api.commit()
             return self.api.sync()
 

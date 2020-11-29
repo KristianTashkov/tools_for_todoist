@@ -30,8 +30,8 @@ class KeyValueStorage:
     def __init__(self):
         self.store = {}
 
-    def get_value(self, key):
-        return self.store.get(key)
+    def get_value(self, key, default=None):
+        return self.store.get(key, default)
 
     def set_value(self, key, value):
         self.store[key] = value

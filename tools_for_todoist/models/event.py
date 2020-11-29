@@ -133,6 +133,9 @@ class CalendarEvent:
     def start(self):
         return self._parse_start(self._raw['start'])
 
+    def end(self):
+        return self._parse_start(self._raw['end'])
+
     def _get_original_start(self):
         return self._parse_start(self._raw['originalStartTime'])
 
@@ -261,6 +264,9 @@ class CalendarEvent:
         attendees = self._raw.get('attendees', [])
         self_attendee = next((x for x in attendees if x.get('self', False)), None)
         return self_attendee['responseStatus'] if self_attendee is not None else None
+
+    def duration(self):
+        return (self.end() - self.start()).total_seconds() / 60
 
     def __repr__(self):
         cancelled_tag = 'cancelled|' if self._is_cancelled() else ''

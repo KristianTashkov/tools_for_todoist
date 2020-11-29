@@ -807,3 +807,12 @@ class CalendarEventTests(TestCase):
             .create_event()
         )
         self.assertEqual(event.response_status(), 'some status')
+
+    def test_duration(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:00:00+01:00')
+            .set_end_date(datetime='2020-01-10T11:30:00+01:00')
+            .create_event()
+        )
+        self.assertEqual(event.duration(), 90.0)
