@@ -816,3 +816,19 @@ class CalendarEventTests(TestCase):
             .create_event()
         )
         self.assertEqual(event.duration(), 90.0)
+
+    def test_attendees(self):
+        event = (
+            EventBuilder()
+            .set_start_date(datetime='2020-01-10T10:00:00+01:00')
+            .add_attendee(is_self=True, email='kris')
+            .add_attendee(resource=True, email='some_room')
+            .add_attendee(email='other', status='declined')
+            .create_event()
+        )
+        expected_attendees = [
+            {'email': 'kris', 'responseStatus': 'accepted', 'self': True},
+            {'email': 'some_room', 'resource': True, 'responseStatus': 'accepted'},
+            {'email': 'other', 'responseStatus': 'declined'},
+        ]
+        self.assertEqual(event.attendees(), expected_attendees)

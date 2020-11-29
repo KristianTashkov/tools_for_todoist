@@ -253,20 +253,20 @@ class CalendarEvent:
 
     def is_declined_by_others(self):
         other_attendees = [
-            x
-            for x in self._raw.get('attendees', [])
-            if not x.get('self', False) and not x.get('resource', False)
+            x for x in self.attendees() if not x.get('self', False) and not x.get('resource', False)
         ]
         all_declined = all([x['responseStatus'] == 'declined' for x in other_attendees])
         return len(other_attendees) > 0 and all_declined
 
     def response_status(self):
-        attendees = self._raw.get('attendees', [])
-        self_attendee = next((x for x in attendees if x.get('self', False)), None)
+        self_attendee = next((x for x in self.attendees() if x.get('self', False)), None)
         return self_attendee['responseStatus'] if self_attendee is not None else None
 
     def duration(self):
         return (self.end() - self.start()).total_seconds() / 60
+
+    def attendees(self):
+        return self._raw.get('attendees', [])
 
     def __repr__(self):
         cancelled_tag = 'cancelled|' if self._is_cancelled() else ''

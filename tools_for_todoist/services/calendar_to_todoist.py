@@ -34,9 +34,11 @@ logger = logging.getLogger(__name__)
 CALENDAR_EVENT_TODOIST_KEY = 'todoist_item_id'
 CALENDAR_EVENT_ID = 'calendar_event_id'
 CALENDAR_LAST_COMPLETED = 'last_completed'
+
 CALENDAR_TO_TODOIST_LABEL = 'calendar_to_todoist.label'
 CALENDAR_TO_TODOIST_NEEDS_ACTION_LABEL = 'calendar_to_todoist.needs_action_label'
 CALENDAR_TO_TODOIST_DURATION_LABELS = 'calendar_to_todoist.duration_labels'
+CALENDAR_TO_TODOIST_ATTENDEE_LABELS = 'calendar_to_todoist.attendee_labels'
 
 
 def _todoist_id(calendar_event):
@@ -71,6 +73,7 @@ class CalendarToTodoistService:
             (float(duration_limit), label)
             for duration_limit, label in duration_labels_config.items()
         ]
+        self.attendee_labels = get_storage().get_value(CALENDAR_TO_TODOIST_ATTENDEE_LABELS, {})
         self.needs_action_label = get_storage().get_value(CALENDAR_TO_TODOIST_NEEDS_ACTION_LABEL)
         self.calendar_label = get_storage().get_value(CALENDAR_TO_TODOIST_LABEL)
 
@@ -112,6 +115,15 @@ class CalendarToTodoistService:
                 if duration <= duration_limit:
                     item.add_label(label)
                     break
+        if self.attendee_labels:
+            attendees = {
+                x['email'] for x in event_source.attendees() if x['responseStatus'] != 'declined'
+            }
+            for attendee, label in self.attendee_labels.items():
+                if attendee in attendees:
+                    item.add_label(label)
+                else:
+                    item.remove_label(label)
 
     def _create_todoist_item(self, calendar_event):
         next_occurrence, event_source = _next_occurrence(calendar_event)

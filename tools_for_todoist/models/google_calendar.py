@@ -160,7 +160,9 @@ class GoogleCalendar:
 
     def sync(self):
         request = self.api.events().list(
-            calendarId=self._calendar_id, syncToken=self.sync_token, showDeleted=True
+            calendarId=self._calendar_id,
+            syncToken=self.sync_token,
+            showDeleted=True,
         )
         response = None
 
