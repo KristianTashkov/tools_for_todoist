@@ -681,6 +681,7 @@ class CalendarEventTests(TestCase):
             (1, '2TU', 'second Tue'),
             (1, '3FR', 'third Fri'),
             (1, '4SU', 'fourth Sun'),
+            (1, '-1SU', 'last Sun'),
             (2, '4SU', 'fourth Sun'),
         ]
         for interval, byday, expected_clarification in byday_config:

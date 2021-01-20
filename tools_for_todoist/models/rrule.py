@@ -24,8 +24,15 @@ def _parse_byday(byday):
         return ''
 
     def _parse_day(day):
-        match = re.match(r'(\d)?([A-Z]{2})', day)
-        count_map = {None: '', '1': 'first ', '2': 'second ', '3': 'third ', '4': 'fourth '}
+        match = re.match(r'(-?\d)?([A-Z]{2})', day)
+        count_map = {
+            None: '',
+            '-1': 'last ',
+            '1': 'first ',
+            '2': 'second ',
+            '3': 'third ',
+            '4': 'fourth ',
+        }
         day_map = {
             'MO': 'Mon',
             'TU': 'Tue',
