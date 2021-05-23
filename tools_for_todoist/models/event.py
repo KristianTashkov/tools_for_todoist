@@ -183,7 +183,8 @@ class CalendarEvent:
         instances = self._get_rrule()
 
         if instances is None:
-            return (start, self) if after_dt < start else (None, None)
+            is_declined = self.is_declined_by_me() or self.is_declined_by_others()
+            return (start, self) if after_dt < start and not is_declined else (None, None)
 
         next_occurrence, source_event = self._find_next_occurrence(instances, after_dt)
         if next_occurrence is not None:
