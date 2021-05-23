@@ -40,6 +40,7 @@ CALENDAR_TO_TODOIST_LABEL = 'calendar_to_todoist.label'
 CALENDAR_TO_TODOIST_NEEDS_ACTION_LABEL = 'calendar_to_todoist.needs_action_label'
 CALENDAR_TO_TODOIST_DURATION_LABELS = 'calendar_to_todoist.duration_labels'
 CALENDAR_TO_TODOIST_ATTENDEE_LABELS = 'calendar_to_todoist.attendee_labels'
+CALENDAR_TO_TODOIST_UNCOMPLETABLE_EVENTS = 'calendar_to_todoist.uncompletable_events'
 
 
 def _todoist_id(calendar_event):
@@ -51,22 +52,10 @@ def _todoist_id(calendar_event):
     return int(todoist_id)
 
 
-def _todoist_title(calendar_event):
-    title = calendar_event.summary if calendar_event.summary is not None else '(No title)'
-    return f'[{title}]({calendar_event.html_link()})'
-
-
 def _todoist_description(calendar_event):
     video_link = calendar_event.conference_link()
     description = markdownify(calendar_event.description())
     return f'**Conference:** {video_link}\n ------ \n\n{description}' if video_link else description
-
-
-def _next_occurrence(calendar_event, last_completed_source=None):
-    last_completed = parse(
-        (last_completed_source or calendar_event).get_private_info(CALENDAR_LAST_COMPLETED)
-    )
-    return calendar_event.next_occurrence(last_completed)
 
 
 class CalendarToTodoistService:
@@ -83,6 +72,26 @@ class CalendarToTodoistService:
         self.attendee_labels = get_storage().get_value(CALENDAR_TO_TODOIST_ATTENDEE_LABELS, {})
         self.needs_action_label = get_storage().get_value(CALENDAR_TO_TODOIST_NEEDS_ACTION_LABEL)
         self.calendar_label = get_storage().get_value(CALENDAR_TO_TODOIST_LABEL)
+        self.are_events_uncompletable = get_storage().get_value(
+            CALENDAR_TO_TODOIST_UNCOMPLETABLE_EVENTS, False
+        )
+
+    def _todoist_title(self, calendar_event):
+        title = calendar_event.summary if calendar_event.summary is not None else '(No title)'
+        uncompletable_flag = '* ' if self.are_events_uncompletable else ''
+        return f'{uncompletable_flag}[{title}]({calendar_event.html_link()})'
+
+    def _next_occurrence(self, calendar_event, last_completed_source=None):
+        if self.are_events_uncompletable:
+            now = datetime.now(gettz(self.google_calendar.default_timezone))
+            after_dt = now - (
+                timedelta(days=1) if is_allday(calendar_event.start()) else timedelta(hours=1)
+            )
+        else:
+            after_dt = parse(
+                (last_completed_source or calendar_event).get_private_info(CALENDAR_LAST_COMPLETED)
+            )
+        return calendar_event.next_occurrence(after_dt)
 
     def _set_default_last_completed(self, calendar_event):
         now = datetime.now(gettz(self.google_calendar.default_timezone))
@@ -97,8 +106,11 @@ class CalendarToTodoistService:
         if todoist_item.is_completed():
             return False
 
-        next_occurrence, event_source = _next_occurrence(calendar_event)
-        todoist_item.content = _todoist_title(event_source)
+        next_occurrence, event_source = self._next_occurrence(calendar_event)
+        if next_occurrence is None:
+            self.todoist.archive_item(todoist_item)
+            return True
+        todoist_item.content = self._todoist_title(event_source)
         todoist_item.description = _todoist_description(event_source)
         todoist_item.set_due(next_occurrence, calendar_event.recurrence_string())
         self._set_labels(event_source, todoist_item)
@@ -134,8 +146,8 @@ class CalendarToTodoistService:
                     item.remove_label(label)
 
     def _create_todoist_item(self, calendar_event):
-        next_occurrence, event_source = _next_occurrence(calendar_event)
-        todoist_title = _todoist_title(event_source)
+        next_occurrence, event_source = self._next_occurrence(calendar_event)
+        todoist_title = self._todoist_title(event_source)
         item = TodoistItem(self.todoist, todoist_title, self.todoist.active_project_id)
         item.set_due(next_occurrence, calendar_event.recurrence_string())
         item.description = _todoist_description(event_source)
@@ -161,7 +173,7 @@ class CalendarToTodoistService:
 
         self._ensure_last_completed(calendar_event, todoist_item)
 
-        if _next_occurrence(calendar_event)[0] is None:
+        if self._next_occurrence(calendar_event)[0] is None:
             if todoist_item is None or todoist_item.is_completed():
                 return
 
@@ -195,7 +207,7 @@ class CalendarToTodoistService:
             return self._process_new_event(calendar_event)
         todoist_item = self.todoist.get_item_by_id(todoist_id)
 
-        if _next_occurrence(calendar_event)[0] is None:
+        if self._next_occurrence(calendar_event)[0] is None:
             if todoist_item is not None and not todoist_item.is_completed():
                 todoist_item.archive()
             return None
@@ -204,7 +216,7 @@ class CalendarToTodoistService:
         if (
             todoist_item is not None
             and todoist_item.is_completed()
-            and _next_occurrence(old_calendar_event, last_completed_source=calendar_event)[0]
+            and self._next_occurrence(old_calendar_event, last_completed_source=calendar_event)[0]
             is None
         ):
             todoist_item.uncomplete()
@@ -264,7 +276,7 @@ class CalendarToTodoistService:
             logger.warning(f'Link to calendar event missing for {item}')
             return False
 
-        current_completed = _next_occurrence(calendar_event)[0]
+        current_completed = self._next_occurrence(calendar_event)[0]
         if current_completed is None:
             logger.warning(f'Completion for {item} without next viable occurrence')
             return False
@@ -275,7 +287,7 @@ class CalendarToTodoistService:
         calendar_event.save_private_info(CALENDAR_LAST_COMPLETED, current_completed)
         calendar_event.save()
 
-        if item.is_completed() or _next_occurrence(calendar_event)[0] is None:
+        if item.is_completed() or self._next_occurrence(calendar_event)[0] is None:
             return False
         return self._update_todoist_item(item, calendar_event)
 
@@ -306,6 +318,12 @@ class CalendarToTodoistService:
 
     def sync(self):
         google_calendar_sync_result, new_event_item_links = self._google_calendar_sync()
+        for item_id, event in self.item_to_event.items():
+            todoist_item = self.todoist.get_item_by_id(item_id)
+            if todoist_item is None:
+                continue
+            self._update_todoist_item(todoist_item, event)
+
         todoist_sync_results = self._todoist_sync()
 
         for calendar_event, todoist_item in new_event_item_links:
