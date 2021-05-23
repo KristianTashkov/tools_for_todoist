@@ -27,9 +27,15 @@ from tools_for_todoist.tests.models.event_builder import EventBuilder
 class CalendarEventTests(TestCase):
     def test_from_raw(self):
         event = (
-            EventBuilder().set_id('id').set_title('Title').set_info('key', 'value').create_event()
+            EventBuilder()
+            .set_id('id')
+            .set_title('Title')
+            .set_info('key', 'value')
+            .set_description('description')
+            .create_event()
         )
         self.assertEqual(event.summary, 'Title')
+        self.assertEqual(event.description(), 'description')
         self.assertEqual(event.id(), 'id')
         self.assertEqual(event.get_private_info('key'), 'value')
 

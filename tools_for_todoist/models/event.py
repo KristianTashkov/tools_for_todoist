@@ -268,6 +268,9 @@ class CalendarEvent:
     def attendees(self):
         return self._raw.get('attendees', [])
 
+    def description(self):
+        return self._raw.get('description', '')
+
     def __repr__(self):
         cancelled_tag = 'cancelled|' if self._is_cancelled() else ''
         return (

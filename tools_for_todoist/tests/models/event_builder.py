@@ -50,6 +50,10 @@ class EventBuilder:
         self._raw['summary'] = title
         return self
 
+    def set_description(self, description):
+        self._raw['description'] = description
+        return self
+
     def set_info(self, key, value, domain='private'):
         if 'extendedProperties' not in self._raw:
             self._raw['extendedProperties'] = {}

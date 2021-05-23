@@ -92,6 +92,7 @@ class CalendarToTodoistService:
 
         next_occurrence, event_source = _next_occurrence(calendar_event)
         todoist_item.content = _todoist_title(event_source)
+        todoist_item.description = event_source.description()
         todoist_item.set_due(next_occurrence, calendar_event.recurrence_string())
         self._set_labels(event_source, todoist_item)
         return todoist_item.save()
@@ -130,6 +131,7 @@ class CalendarToTodoistService:
         todoist_title = _todoist_title(event_source)
         item = TodoistItem(self.todoist, todoist_title, self.todoist.active_project_id)
         item.set_due(next_occurrence, calendar_event.recurrence_string())
+        item.description = event_source.description()
         self._set_labels(event_source, item)
         item.save()
         return item

@@ -191,7 +191,7 @@ class Todoist:
             ]
             sync_result = self._update_items(active_project_item_updates)
         except Exception as e:
-            logger.exception('Todoist Sync Failed| {result}', exc_info=e)
+            logger.exception(f'Todoist Sync Failed| {result}', exc_info=e)
             raise
         sync_result['raw'] = result
         sync_result['completed'] = self._new_completed()

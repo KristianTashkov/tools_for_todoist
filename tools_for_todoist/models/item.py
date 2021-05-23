@@ -31,6 +31,7 @@ class TodoistItem:
     def __init__(self, todoist, content, project_id):
         self.todoist = todoist
         self.content = content or '(No title)'
+        self.description = ''
         self.project_id = project_id
 
         self.id = -1
@@ -53,6 +54,7 @@ class TodoistItem:
     def update_from_raw(self, raw):
         self._raw = copy.deepcopy(raw)
         self.content = self._raw['content']
+        self.description = self._raw['description']
         self.priority = self._raw['priority']
         self._due = self._raw['due']
         self._in_history = self._raw['in_history']
@@ -137,8 +139,16 @@ class TodoistItem:
 
         updated_rows = {}
         if self.content != self._raw['content']:
-            logger.debug(f'{self.id}: updating content: {self._raw["content"]} to {self.content}')
+            logger.debug(
+                f'{self.id}: updating content: "{self._raw["content"]}" to "{self.content}"'
+            )
             updated_rows['content'] = self.content
+        if self.description != self._raw['description']:
+            logger.debug(
+                f'{self.id}: updating description: '
+                f'"{self._raw["description"]}" to "{self.description}"'
+            )
+            updated_rows['description'] = self.description
         if self.priority != self._raw['priority']:
             logger.debug(
                 f'{self.id}: updating priority: {self._raw["priority"]} to {self.priority}'
