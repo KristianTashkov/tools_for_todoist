@@ -105,6 +105,109 @@ class EventBuilder:
         self._raw['status'] = status
         return self
 
+    def add_zoom(self):
+        conference_data = {
+            'entryPoints': [
+                {
+                    'entryPointType': 'video',
+                    'uri': 'https://hyperscience.zoom.us/j/meeting?pwd=pwd',
+                    'label': 'hyperscience.zoom.us/j/meeting?pwd=pwd',
+                    'meetingCode': '1111111',
+                    'passcode': '222222',
+                },
+                {
+                    'regionCode': 'US',
+                    'entryPointType': 'phone',
+                    'uri': 'tel:+123456,,234543#',
+                    'label': '+1 555-215-8782',
+                    'passcode': '222222',
+                },
+                {
+                    'entryPointType': 'more',
+                    'uri': 'https://www.google.com/url?q=',
+                },
+            ],
+            'conferenceSolution': {
+                'key': {'type': 'addOn'},
+                'name': 'Zoom Meeting',
+                'iconUri': 'https://lh3.googleusercontent.com/big_hash',
+            },
+            'conferenceId': '1111111',
+            'signature': 'signature',
+            'parameters': {
+                'addOnParameters': {
+                    'parameters': {
+                        'scriptId': '1O_9DeEljSH2vrECr8XeFYYRxFFiowFKOivqSDz316BlBcDXrF00BXrkO',
+                        'realMeetingId': '1111111',
+                        'meetingCreatedBy': 'john@doe.com',
+                        'meetingUuid': 'someUUID',
+                        'meetingType': '2',
+                    }
+                }
+            },
+        }
+        self._raw['conferenceData'] = conference_data
+        return self
+
+    def add_google_meet(self):
+        conference_data = {
+            'entryPoints': [
+                {
+                    'entryPointType': 'video',
+                    'uri': 'https://meet.google.com/aaa-bbbb-ccc',
+                    'label': 'meet.google.com/aaa-bbbb-ccc',
+                },
+                {
+                    'entryPointType': 'more',
+                    'uri': 'https://tel.meet/aaa-bbbb-ccc?pin=111111',
+                    'pin': '111111',
+                },
+                {
+                    'regionCode': 'BG',
+                    'entryPointType': 'phone',
+                    'uri': 'tel:+555-2-333-4393',
+                    'label': '+555 2 333 4393',
+                    'pin': '111111',
+                },
+            ],
+            'conferenceSolution': {
+                'key': {'type': 'hangoutsMeet'},
+                'name': 'Google Meet',
+                'iconUri': 'icon_link',
+            },
+            'conferenceId': 'aaa-bbbb-ccc',
+            'signature': 'signature',
+        }
+        self._raw['conferenceData'] = conference_data
+        return self
+
+    def add_no_video_conference(self):
+        conference_data = {
+            'entryPoints': [
+                {
+                    'entryPointType': 'more',
+                    'uri': 'https://tel.meet/aaa-bbbb-ccc?pin=111111',
+                    'pin': '111111',
+                },
+                {
+                    'regionCode': 'BG',
+                    'entryPointType': 'phone',
+                    'uri': 'tel:+555-2-333-4393',
+                    'label': '+555 2 333 4393',
+                    'pin': '111111',
+                },
+            ],
+            'conferenceSolution': {
+                'key': {'type': 'hangoutsMeet'},
+                'name': 'Google Meet',
+                'iconUri': 'icon_link',
+            },
+            'conferenceId': 'aaa-bbbb-ccc',
+            'signature': 'signature',
+        }
+        self._raw['conferenceData'] = conference_data
+        return self
+
     def add_attendee(self, *, is_self=False, status='accepted', resource=None, email=None):
         if 'attendees' not in self._raw:
             self._raw['attendees'] = []

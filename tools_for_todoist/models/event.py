@@ -271,6 +271,17 @@ class CalendarEvent:
     def description(self):
         return self._raw.get('description', '')
 
+    def conference_link(self):
+        conference_data = self._raw.get('conferenceData')
+        if conference_data is None:
+            return None
+        video_entrypoints = [
+            entry['uri']
+            for entry in conference_data['entryPoints']
+            if entry.get('entryPointType') == 'video'
+        ]
+        return video_entrypoints[0] if video_entrypoints else None
+
     def __repr__(self):
         cancelled_tag = 'cancelled|' if self._is_cancelled() else ''
         return (

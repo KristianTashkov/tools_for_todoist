@@ -56,6 +56,12 @@ def _todoist_title(calendar_event):
     return f'[{title}]({calendar_event.html_link()})'
 
 
+def _todoist_description(calendar_event):
+    video_link = calendar_event.conference_link()
+    description = markdownify(calendar_event.description())
+    return f'**Conference:** {video_link}\n ------ \n\n{description}' if video_link else description
+
+
 def _next_occurrence(calendar_event, last_completed_source=None):
     last_completed = parse(
         (last_completed_source or calendar_event).get_private_info(CALENDAR_LAST_COMPLETED)
@@ -93,7 +99,7 @@ class CalendarToTodoistService:
 
         next_occurrence, event_source = _next_occurrence(calendar_event)
         todoist_item.content = _todoist_title(event_source)
-        todoist_item.description = markdownify(event_source.description())
+        todoist_item.description = _todoist_description(event_source)
         todoist_item.set_due(next_occurrence, calendar_event.recurrence_string())
         self._set_labels(event_source, todoist_item)
         return todoist_item.save()
@@ -132,7 +138,7 @@ class CalendarToTodoistService:
         todoist_title = _todoist_title(event_source)
         item = TodoistItem(self.todoist, todoist_title, self.todoist.active_project_id)
         item.set_due(next_occurrence, calendar_event.recurrence_string())
-        item.description = markdownify(event_source.description())
+        item.description = _todoist_description(event_source)
         self._set_labels(event_source, item)
         item.save()
         return item

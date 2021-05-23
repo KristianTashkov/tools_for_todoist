@@ -839,3 +839,16 @@ class CalendarEventTests(TestCase):
             {'email': 'other', 'responseStatus': 'declined'},
         ]
         self.assertEqual(event.attendees(), expected_attendees)
+
+    def test_conference_link(self):
+        event = EventBuilder().create_event()
+        self.assertIsNone(event.conference_link())
+
+        event = EventBuilder().add_no_video_conference().create_event()
+        self.assertIsNone(event.conference_link())
+
+        event = EventBuilder().add_zoom().create_event()
+        self.assertEqual(event.conference_link(), 'https://hyperscience.zoom.us/j/meeting?pwd=pwd')
+
+        event = EventBuilder().add_google_meet().create_event()
+        self.assertEqual(event.conference_link(), 'https://meet.google.com/aaa-bbbb-ccc')
