@@ -139,15 +139,10 @@ class TodoistItem:
 
         updated_rows = {}
         if self.content != self._raw['content']:
-            logger.debug(
-                f'{self.id}: updating content: "{self._raw["content"]}" to "{self.content}"'
-            )
+            logger.debug(f'{self.id}: updating title.')
             updated_rows['content'] = self.content
         if self.description != self._raw['description']:
-            logger.debug(
-                f'{self.id}: updating description: '
-                f'"{self._raw["description"]}" to "{self.description}"'
-            )
+            logger.debug(f'{self.id}: updating description.')
             updated_rows['description'] = self.description
         if self.priority != self._raw['priority']:
             logger.debug(
