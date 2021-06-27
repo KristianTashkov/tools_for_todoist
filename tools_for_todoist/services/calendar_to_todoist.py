@@ -55,7 +55,10 @@ def _todoist_id(calendar_event):
 def _todoist_description(calendar_event):
     video_link = calendar_event.conference_link()
     description = markdownify(calendar_event.description())
-    return f'**Conference:** {video_link}\n ------ \n\n{description}' if video_link else description
+    full_description = (
+        f'**Conference:** {video_link}\n ------ \n\n{description}' if video_link else description
+    )
+    return full_description.strip()
 
 
 class CalendarToTodoistService:
