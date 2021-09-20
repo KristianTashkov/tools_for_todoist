@@ -122,7 +122,10 @@ class CalendarEvent:
         return self._extended_properties.get('private', {}).get(key)
 
     def _get_timezone(self, raw_start):
-        return gettz(raw_start.get('timeZone', self.google_calendar.default_timezone))
+        raw_timezone = raw_start.get('timeZone', self.google_calendar.default_timezone)
+        if raw_timezone == 'UTC':
+            raw_timezone = 'Europe/London'
+        return gettz(raw_timezone)
 
     def _parse_start(self, raw_start):
         if 'date' in raw_start:
