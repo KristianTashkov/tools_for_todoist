@@ -153,7 +153,7 @@ class Todoist:
 
     def archive_item(self, item):
         logger.info(f'Archiving item| {item}')
-        self.api.items.complete(item.id, force_history=True)
+        self.api.items.complete(item.id)
 
     def uncomplete_item(self, item):
         logger.info(f'Uncompleting item| {item}')

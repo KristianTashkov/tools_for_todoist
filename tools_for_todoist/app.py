@@ -21,6 +21,7 @@ import os
 import time
 
 import google.cloud.logging
+from google.auth.exceptions import DefaultCredentialsError
 
 from tools_for_todoist.services.calendar_to_todoist import CalendarToTodoistService
 
@@ -33,8 +34,11 @@ def setup_logger(logging_level=logging.DEBUG):
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
 
-    google_logging_client = google.cloud.logging.Client()
-    logger.addHandler(google_logging_client.get_default_handler())
+    try:
+        google_logging_client = google.cloud.logging.Client()
+        logger.addHandler(google_logging_client.get_default_handler())
+    except DefaultCredentialsError:
+        print('Logging not configured for Google Cloud.')
 
     logger = logging.getLogger('tools_for_todoist')
     logger.setLevel(logging_level)
