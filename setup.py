@@ -32,17 +32,17 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/KristianTashkov/tools_for_todoist",
     packages=setuptools.find_packages(),
-    python_requires='>=3.7',
+    python_requires='>=3.9',
     install_requires=[
-        'todoist-python==8.1.2',
+        'todoist-python==8.1.4',
         'google-api-python-client==1.12.2',
         'google-auth-httplib2==0.0.4',
         'google-auth-oauthlib==0.4.1',
         'python-dateutil==2.8.1',
-        'psycopg2-binary==2.8.6',
-        'markdownify==0.8.0',
+        'psycopg2-binary==2.9.7',
+        'markdownify==0.11.6',
     ],
-    extras_require={'test': ['flake8==3.8.4', 'pytest==6.1.0', 'isort==5.6.4', 'black==20.8b1']},
+    extras_require={'test': ['flake8==6.1.0', 'pytest==7.4.1', 'isort==5.12.0', 'black==23.7.0']},
     entry_points={
         'console_scripts': [
             'tft_lint=run_lint:main',

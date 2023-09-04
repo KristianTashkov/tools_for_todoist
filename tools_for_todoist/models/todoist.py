@@ -18,6 +18,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 import logging
 
+from requests import Session
 from todoist.api import SyncError, TodoistAPI
 
 from tools_for_todoist.models.item import TodoistItem
@@ -40,7 +41,11 @@ class Todoist:
         self._initial_sync(get_storage().get_value(TODOIST_ACTIVE_PROJECT))
 
     def _recreate_api(self):
-        self.api = TodoistAPI(get_storage().get_value(TODOIST_API_KEY))
+        token = get_storage().get_value(TODOIST_API_KEY)
+        headered_session = Session()
+        headered_session.headers['Authorization'] = f'Bearer {token}'
+
+        self.api = TodoistAPI(token, session=headered_session, api_version='v9')
 
     def _activity_sync(self, offset=0, limit=100):
         def activity_get_func():
@@ -121,14 +126,6 @@ class Todoist:
 
     def get_item_by_id(self, id):
         return self._items.get(id)
-
-    def get_label_id_by_name(self, name):
-        return next(iter([x['id'] for x in self.api.state['labels'] if x['name'] == name]), None)
-
-    def get_label_name_by_id(self, label_id):
-        return next(
-            iter([x['name'] for x in self.api.state['labels'] if x['id'] == label_id]), None
-        )
 
     def create_label(self, name):
         logger.info(f'Creating label| {name}')

@@ -38,6 +38,7 @@ class TodoistItem:
         self.priority = 1
         self._due = None
         self._raw = None
+        self._duration = None
         self._in_history = False
         self._labels = set()
 
@@ -57,9 +58,13 @@ class TodoistItem:
         self.description = self._raw['description']
         self.priority = self._raw['priority']
         self._due = self._raw['due']
-        self._in_history = self._raw['in_history']
+        self._in_history = self._raw['checked']
         self.project_id = self._raw['project_id']
-        self._labels = set(int(x) for x in self._raw['labels'])
+        self._labels = set(self._raw['labels'])
+        self._duration = self._raw['duration']
+
+    def duration(self):
+        return self._duration.copy()
 
     def is_recurring(self):
         return self._due is not None and self._due.get('is_recurring')
@@ -102,6 +107,9 @@ class TodoistItem:
         if due_string is not None:
             self._due['string'] = due_string
 
+    def set_duration(self, duration):
+        self._duration = duration
+
     def is_completed(self):
         if self.id == -1:
             return False
@@ -114,14 +122,10 @@ class TodoistItem:
         return self._labels
 
     def add_label(self, label):
-        label_id = self.todoist.get_label_id_by_name(label)
-        if label_id is None:
-            label_id = self.todoist.create_label(label)
-        self._labels.add(label_id)
+        self._labels.add(label)
 
     def remove_label(self, label):
-        label_id = self.todoist.get_label_id_by_name(label)
-        self._labels.discard(label_id)
+        self._labels.discard(label)
 
     def uncomplete(self):
         self._in_history = False
@@ -153,10 +157,9 @@ class TodoistItem:
             logger.debug(f'{self.id}: updating due: {self._raw["due"]} to {self._due}')
             updated_rows['due'] = self._due
         if self._labels != set(self._raw['labels']):
-            old_labels = [self.todoist.get_label_name_by_id(x) for x in self._raw["labels"]]
-            new_labels = [self.todoist.get_label_name_by_id(x) for x in self._labels]
-            logger.debug(f'{self.id}: updating labels: {old_labels} to {new_labels}')
             updated_rows['labels'] = list(self._labels)
+        if self._duration != self._raw['duration']:
+            updated_rows['duration'] = self._duration
         if len(updated_rows) == 0:
             return False
         self.todoist.update_item(self, **updated_rows)

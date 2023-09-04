@@ -45,11 +45,7 @@ CALENDAR_TO_TODOIST_UNCOMPLETABLE_EVENTS = 'calendar_to_todoist.uncompletable_ev
 
 def _todoist_id(calendar_event):
     todoist_id = calendar_event.get_private_info(CALENDAR_EVENT_TODOIST_KEY)
-    if todoist_id is None:
-        return None
-    if not re.fullmatch(r'[\d]*', todoist_id):
-        return None
-    return int(todoist_id)
+    return todoist_id
 
 
 def _todoist_description(calendar_event):
@@ -70,7 +66,7 @@ class CalendarToTodoistService:
         self.google_calendar = GoogleCalendar()
         self.item_to_event = {}
         self.duration_labels = None
-        duration_labels_config = get_storage().get_value(CALENDAR_TO_TODOIST_DURATION_LABELS, [])
+        duration_labels_config = get_storage().get_value(CALENDAR_TO_TODOIST_DURATION_LABELS, {})
         self.duration_labels = [
             (float(duration_limit), label)
             for duration_limit, label in duration_labels_config.items()
@@ -119,6 +115,7 @@ class CalendarToTodoistService:
         todoist_item.content = self._todoist_title(event_source)
         todoist_item.description = _todoist_description(event_source)
         todoist_item.set_due(next_occurrence, calendar_event.recurrence_string())
+        todoist_item.set_duration(event_source.todoist_duration())
         self._set_labels(event_source, todoist_item)
         return todoist_item.save()
 
@@ -157,6 +154,7 @@ class CalendarToTodoistService:
         item = TodoistItem(self.todoist, todoist_title, self.todoist.active_project_id)
         item.set_due(next_occurrence, calendar_event.recurrence_string())
         item.description = _todoist_description(event_source)
+        item.set_duration(event_source.todoist_duration())
         self._set_labels(event_source, item)
         item.save()
         return item

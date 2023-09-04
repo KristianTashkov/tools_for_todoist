@@ -266,6 +266,12 @@ class CalendarEvent:
         self_attendee = next((x for x in self.attendees() if x.get('self', False)), None)
         return self_attendee['responseStatus'] if self_attendee is not None else None
 
+    def todoist_duration(self):
+        duration = self.duration()
+        if is_allday(self.start()):
+            return {'amount': int(duration / 60 / 24), 'unit': 'day'}
+        return {'amount': int(duration), 'unit': 'minute'}
+
     def duration(self):
         return (self.end() - self.start()).total_seconds() / 60
 
