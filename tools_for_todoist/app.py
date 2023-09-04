@@ -20,6 +20,8 @@ import logging
 import os
 import time
 
+import google.cloud.logging
+
 from tools_for_todoist.services.calendar_to_todoist import CalendarToTodoistService
 
 
@@ -30,6 +32,9 @@ def setup_logger(logging_level=logging.DEBUG):
     formatter = logging.Formatter('[%(levelname)s] %(name)s: %(message)s')
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
+
+    google_logging_client = google.cloud.logging.Client()
+    logger.addHandler(google_logging_client.get_default_handler())
 
     logger = logging.getLogger('tools_for_todoist')
     logger.setLevel(logging_level)
