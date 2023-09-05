@@ -36,6 +36,7 @@ CALENDAR_EVENT_TODOIST_KEY = 'todoist_item_id'
 CALENDAR_EVENT_ID = 'calendar_event_id'
 CALENDAR_LAST_COMPLETED = 'last_completed'
 
+CALENDAR_TO_TODOIST_ACTIVE_PROJECT = 'calendar_to_todoist.active_project'
 CALENDAR_TO_TODOIST_LABEL = 'calendar_to_todoist.label'
 CALENDAR_TO_TODOIST_NEEDS_ACTION_LABEL = 'calendar_to_todoist.needs_action_label'
 CALENDAR_TO_TODOIST_DURATION_LABELS = 'calendar_to_todoist.duration_labels'
@@ -66,6 +67,10 @@ class CalendarToTodoistService:
         self.google_calendar = GoogleCalendar()
         self.item_to_event = {}
         self.duration_labels = None
+        self.active_project = self.todoist.get_project_by_name(
+            get_storage().get_value(CALENDAR_TO_TODOIST_ACTIVE_PROJECT)
+        )
+
         duration_labels_config = get_storage().get_value(CALENDAR_TO_TODOIST_DURATION_LABELS, {})
         self.duration_labels = [
             (float(duration_limit), label)
@@ -151,7 +156,7 @@ class CalendarToTodoistService:
     def _create_todoist_item(self, calendar_event):
         next_occurrence, event_source = self._next_occurrence(calendar_event)
         todoist_title = self._todoist_title(event_source)
-        item = TodoistItem(self.todoist, todoist_title, self.todoist.active_project_id)
+        item = TodoistItem(self.todoist, todoist_title, self.active_project['id'])
         item.set_due(next_occurrence, calendar_event.recurrence_string())
         item.description = _todoist_description(event_source)
         item.set_duration(event_source.todoist_duration())
@@ -271,10 +276,13 @@ class CalendarToTodoistService:
         item = self.todoist.get_item_by_id(item_id)
         item_info = item if item is not None else f'Deleted item {item_id}'
 
-        logger.info(f'Completed Item| {item_info}')
         if item is None or item.has_parent():
             return False
 
+        if item.project_id != self.active_project['id']:
+            return False
+
+        logger.info(f'Completed Item| {item_info}')
         calendar_event = self.item_to_event.get(item_id)
         if calendar_event is None:
             logger.warning(f'Link to calendar event missing for {item}')
@@ -296,6 +304,8 @@ class CalendarToTodoistService:
         return self._update_todoist_item(item, calendar_event)
 
     def _process_updated_item(self, old, new):
+        if new.project_id != self.active_project['id']:
+            return False
         calendar_event = self.item_to_event.get(new.id)
         if calendar_event is None:
             return False

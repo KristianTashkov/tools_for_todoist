@@ -62,13 +62,20 @@ def run_sync_service(logger):
 
 def main():
     logger = setup_logger(os.environ.get('LOGGING_LEVEL', logging.DEBUG))
-    while True:
+    retry_count = 0
+    max_retries = 5
+    while retry_count < max_retries:
         try:
             run_sync_service(logger)
+            retry_count = 0
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception as e:
-            logger.exception('Restarting app after exception!', exc_info=e)
+            retry_count += 1
+            if retry_count < max_retries:
+                logger.exception(
+                    f'Restarting app after exception! Retry {retry_count}.', exc_info=e
+                )
 
 
 if __name__ == '__main__':

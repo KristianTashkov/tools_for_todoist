@@ -34,7 +34,7 @@ class TodoistItem:
         self.description = ''
         self.project_id = project_id
 
-        self.id = -1
+        self.id = None
         self.priority = 1
         self._due = None
         self._raw = None
@@ -111,7 +111,7 @@ class TodoistItem:
         self._duration = duration
 
     def is_completed(self):
-        if self.id == -1:
+        if self.id is None:
             return False
         return self._in_history
 
@@ -136,7 +136,7 @@ class TodoistItem:
         self.todoist.archive_item(self)
 
     def save(self):
-        if self.id == -1:
+        if self.id is None:
             self._raw = self.todoist.add_item(self)
             self.id = self._raw['id']
             return True
