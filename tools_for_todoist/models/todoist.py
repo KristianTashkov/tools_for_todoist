@@ -17,6 +17,9 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 import logging
+from contextlib import ExitStack
+from tempfile import TemporaryDirectory
+from typing import Optional
 
 from requests import Session
 from todoist.api import SyncError, TodoistAPI
@@ -32,6 +35,7 @@ TODOIST_API_KEY = 'todoist.api_key'
 
 class Todoist:
     def __init__(self):
+        self._exit_stack: Optional[ExitStack] = None
         self._recreate_api()
         self.api.reset_state()
         self._items = {}
@@ -40,11 +44,15 @@ class Todoist:
         self._initial_sync()
 
     def _recreate_api(self):
+        if self._exit_stack is not None:
+            self._exit_stack.close()
+        self._exit_stack = ExitStack()
         token = get_storage().get_value(TODOIST_API_KEY)
         headered_session = Session()
         headered_session.headers['Authorization'] = f'Bearer {token}'
 
-        self.api = TodoistAPI(token, session=headered_session, api_version='v9')
+        new_temp_dir = self._exit_stack.enter_context(TemporaryDirectory())
+        self.api = TodoistAPI(token, session=headered_session, api_version='v9', cache=new_temp_dir)
 
     def _activity_sync(self, offset=0, limit=100):
         def activity_get_func():
@@ -124,7 +132,7 @@ class Todoist:
                 updated_items.append((old_item, item_model))
         return {'deleted': deleted_items, 'created': new_items, 'updated': updated_items}
 
-    def get_item_by_id(self, item_id):
+    def get_item_by_id(self, item_id: str) -> TodoistItem:
         return self._items.get(item_id)
 
     def get_project_by_name(self, name):
