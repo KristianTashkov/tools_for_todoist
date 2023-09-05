@@ -28,7 +28,6 @@ from tools_for_todoist.utils import retry_flaky_function
 logger = logging.getLogger(__name__)
 
 TODOIST_API_KEY = 'todoist.api_key'
-TODOIST_ACTIVE_PROJECT = 'todoist.active_project'
 
 
 class Todoist:
@@ -36,9 +35,9 @@ class Todoist:
         self._recreate_api()
         self.api.reset_state()
         self._items = {}
+        self._projects = {}
         self._last_completed = None
-        self.active_project_id = -1
-        self._initial_sync(get_storage().get_value(TODOIST_ACTIVE_PROJECT))
+        self._initial_sync()
 
     def _recreate_api(self):
         token = get_storage().get_value(TODOIST_API_KEY)
@@ -52,7 +51,6 @@ class Todoist:
             return self.api.activity.get(
                 object_type='item',
                 event_type='completed',
-                parent_project_id=self.active_project_id,
                 offset=offset,
                 limit=limit,
             )
@@ -64,22 +62,24 @@ class Todoist:
             on_failure_func=self._recreate_api,
         )
 
-    def _initial_sync(self, active_project_name):
+    def _update_projects(self, sync_result):
+        for project in sync_result['projects']:
+            self._projects[project['id']] = project
+
+    def _initial_sync(self):
         self._initial_result = retry_flaky_function(
             self.api.sync,
             'todoist_initial_sync',
             on_failure_func=self._recreate_api,
             validate_result_func=lambda x: x and 'projects' in x and 'items' in x,
         )
-        self.active_project_id = [
-            x for x in self._initial_result['projects'] if x['name'] == active_project_name
-        ][0]['id']
         for item in self._initial_result['items']:
-            if item['project_id'] != self.active_project_id:
-                continue
             self._items[item['id']] = TodoistItem.from_raw(self, item)
-        for item in self.api.items.get_completed(self.active_project_id, limit=200):
-            self._items[item['id']] = TodoistItem.from_raw(self, item)
+        self._update_projects(self._initial_result)
+        for project_id in self._projects.keys():
+            # TODO(kris): Improve this completed logic or deprecate
+            for item in self.api.items.get_completed(project_id, limit=200):
+                self._items[item['id']] = TodoistItem.from_raw(self, item)
         activity_result = self._activity_sync(limit=1)
         if activity_result['count']:
             self._last_completed = activity_result['events'][0]['id']
@@ -124,8 +124,14 @@ class Todoist:
                 updated_items.append((old_item, item_model))
         return {'deleted': deleted_items, 'created': new_items, 'updated': updated_items}
 
-    def get_item_by_id(self, id):
-        return self._items.get(id)
+    def get_item_by_id(self, item_id):
+        return self._items.get(item_id)
+
+    def get_project_by_name(self, name):
+        for project in self._projects.values():
+            if project['name'] == name:
+                return project
+        return None
 
     def create_label(self, name):
         logger.info(f'Creating label| {name}')
@@ -181,12 +187,9 @@ class Todoist:
                 if item:
                     item.id = new_id
                     self._items[new_id] = item
-            active_project_item_updates = [
-                x
-                for x in result['items']
-                if x['project_id'] == self.active_project_id or x['project_id'] == 0
-            ]
-            sync_result = self._update_items(active_project_item_updates)
+            item_updates = [x for x in result['items']]
+            self._update_projects(result)
+            sync_result = self._update_items(item_updates)
         except Exception as e:
             logger.exception(f'Todoist Sync Failed| {result}', exc_info=e)
             raise

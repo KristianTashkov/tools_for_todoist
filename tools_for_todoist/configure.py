@@ -26,8 +26,11 @@ from tools_for_todoist.models.google_calendar import (
     GOOGLE_CALENDAR_TOKEN,
     GoogleCalendar,
 )
-from tools_for_todoist.models.todoist import TODOIST_ACTIVE_PROJECT, TODOIST_API_KEY, Todoist
-from tools_for_todoist.services.calendar_to_todoist import CALENDAR_TO_TODOIST_LABEL
+from tools_for_todoist.models.todoist import TODOIST_API_KEY, Todoist
+from tools_for_todoist.services.calendar_to_todoist import (
+    CALENDAR_TO_TODOIST_ACTIVE_PROJECT,
+    CALENDAR_TO_TODOIST_LABEL,
+)
 from tools_for_todoist.storage import (
     DEFAULT_STORAGE,
     LocalKeyValueStorage,
@@ -66,9 +69,6 @@ def manual_flow():
     print('Enter Todoist API key:')
     todoist_key = input()
     storage.set_value(TODOIST_API_KEY, todoist_key)
-    print('Enter Todoist project name in which events to be synced:')
-    todoist_project = input()
-    storage.set_value(TODOIST_ACTIVE_PROJECT, todoist_project)
     print('Attempting to sync Todoist...')
     Todoist()
     print('Todoist synced successfully!')
@@ -86,6 +86,10 @@ def manual_flow():
     print('Attempting to sync Google Calendar...')
     google_calendar = GoogleCalendar()
     google_calendar.sync()
+
+    print('Enter Todoist project name in which events to be synced:')
+    todoist_project = input()
+    storage.set_value(CALENDAR_TO_TODOIST_ACTIVE_PROJECT, todoist_project)
 
     print('Enter label name to be added to each synced item (leave blank not to use this):')
     calendar_item_label = input()
