@@ -24,9 +24,7 @@ from dateutil.parser import parse
 from dateutil.tz import UTC, gettz
 from markdownify import markdownify
 
-from tools_for_todoist.models.google_calendar import GoogleCalendar
 from tools_for_todoist.models.item import TodoistItem
-from tools_for_todoist.models.todoist import Todoist
 from tools_for_todoist.storage import get_storage
 from tools_for_todoist.utils import is_allday
 
@@ -62,10 +60,11 @@ def _todoist_description(calendar_event):
 
 
 class CalendarToTodoistService:
-    def __init__(self):
-        self.todoist = Todoist()
-        self.google_calendar = GoogleCalendar()
+    def __init__(self, todoist, google_calendar):
+        self.todoist = todoist
+        self.google_calendar = google_calendar
         self.item_to_event = {}
+        self._pending_new_event_item_links = []
         self.duration_labels = None
         self.active_project = self.todoist.get_project_by_name(
             get_storage().get_value(CALENDAR_TO_TODOIST_ACTIVE_PROJECT)
@@ -90,9 +89,12 @@ class CalendarToTodoistService:
 
     def _next_occurrence(self, calendar_event, last_completed_source=None):
         if self.are_events_uncompletable:
+            event_duration = (last_completed_source or calendar_event).duration()
             now = datetime.now(gettz(self.google_calendar.default_timezone))
             after_dt = now - (
-                timedelta(days=1) if is_allday(calendar_event.start()) else timedelta(hours=1)
+                timedelta(days=1)
+                if is_allday(calendar_event.start())
+                else timedelta(minutes=int(event_duration))
             )
         else:
             after_dt = parse(
@@ -250,8 +252,7 @@ class CalendarToTodoistService:
         logger.info(f'Merging Event| {calendar_event}')
         todoist_item.archive()
 
-    def _google_calendar_sync(self):
-        sync_result = self.google_calendar.sync()
+    def _process_calendar_sync(self, sync_result):
         new_event_item_links = []
 
         for calendar_event in sync_result.created_events:
@@ -270,7 +271,7 @@ class CalendarToTodoistService:
         for calendar_event in sync_result.merged_event_instances:
             self._process_merged_event(calendar_event)
 
-        return sync_result, new_event_item_links
+        self._pending_new_event_item_links.extend(new_event_item_links)
 
     def _process_completed_item(self, item_id):
         item = self.todoist.get_item_by_id(item_id)
@@ -316,34 +317,29 @@ class CalendarToTodoistService:
         calendar_event.save()
         return self._update_todoist_item(new, calendar_event)
 
-    def _todoist_sync(self):
-        should_sync = True
-        sync_results = []
-        while should_sync:
-            sync_result = self.todoist.sync()
-            should_sync = False
+    def _process_todoist_sync(self, sync_result):
+        should_sync = False
 
-            for item_id in sync_result['completed']:
-                should_sync |= self._process_completed_item(item_id)
-            for old, new in sync_result['updated']:
-                should_sync |= self._process_updated_item(old, new)
-            sync_results.append(sync_result)
-        return sync_results
+        for item_id in sync_result['completed']:
+            should_sync |= self._process_completed_item(item_id)
+        for old, new in sync_result['updated']:
+            should_sync |= self._process_updated_item(old, new)
+        return should_sync
 
-    def sync(self):
-        google_calendar_sync_result, new_event_item_links = self._google_calendar_sync()
+    def on_calendar_sync(self, google_calendar_sync_result):
+        self._process_calendar_sync(google_calendar_sync_result)
         for item_id, event in self.item_to_event.items():
             todoist_item = self.todoist.get_item_by_id(item_id)
             if todoist_item is None:
                 continue
             self._update_todoist_item(todoist_item, event)
 
-        todoist_sync_results = self._todoist_sync()
-
-        for calendar_event, todoist_item in new_event_item_links:
+    def on_todoist_sync(self, todoist_sync_result):
+        should_sync_again = self._process_todoist_sync(todoist_sync_result)
+        for calendar_event, todoist_item in self._pending_new_event_item_links:
             calendar_event.save_private_info(CALENDAR_EVENT_TODOIST_KEY, todoist_item.id)
             calendar_event.save_private_info(CALENDAR_EVENT_ID, calendar_event.id())
             calendar_event.save()
             self.item_to_event[todoist_item.id] = calendar_event
-
-        return {'todoist': todoist_sync_results, 'google_calendar': google_calendar_sync_result}
+        self._pending_new_event_item_links.clear()
+        return should_sync_again

@@ -23,6 +23,8 @@ import time
 import google.cloud.logging
 from google.auth.exceptions import DefaultCredentialsError
 
+from tools_for_todoist.models.google_calendar import GoogleCalendar
+from tools_for_todoist.models.todoist import Todoist
 from tools_for_todoist.services.calendar_to_todoist import CalendarToTodoistService
 
 
@@ -46,17 +48,19 @@ def setup_logger(logging_level=logging.DEBUG):
 
 
 def run_sync_service(logger):
-    sync_service = CalendarToTodoistService()
+    todoist = Todoist()
+    google_calendar = GoogleCalendar()
+    calendar_service = CalendarToTodoistService(todoist, google_calendar)
     logger.info('Started syncing service.')
 
     while True:
-        result = sync_service.sync()
-        for todoist_sync_result in result['todoist']:
-            for item in todoist_sync_result['created']:
-                logger.info(f'RAW|Created Item| {item}')
-            for item in todoist_sync_result['deleted']:
-                logger.info(f'RAW|Deleted Item| {item}')
+        calendar_sync_result = google_calendar.sync()
+        calendar_service.on_calendar_sync(calendar_sync_result)
 
+        should_keep_syncing = True
+        while should_keep_syncing:
+            todoist_sync_result = todoist.sync()
+            should_keep_syncing = calendar_service.on_todoist_sync(todoist_sync_result)
         time.sleep(10)
 
 
