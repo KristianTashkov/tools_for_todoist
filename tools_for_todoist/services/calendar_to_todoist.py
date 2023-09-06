@@ -37,7 +37,6 @@ CALENDAR_LAST_COMPLETED = 'last_completed'
 CALENDAR_TO_TODOIST_ACTIVE_PROJECT = 'calendar_to_todoist.active_project'
 CALENDAR_TO_TODOIST_LABEL = 'calendar_to_todoist.label'
 CALENDAR_TO_TODOIST_NEEDS_ACTION_LABEL = 'calendar_to_todoist.needs_action_label'
-CALENDAR_TO_TODOIST_DURATION_LABELS = 'calendar_to_todoist.duration_labels'
 CALENDAR_TO_TODOIST_ATTENDEE_LABELS = 'calendar_to_todoist.attendee_labels'
 CALENDAR_TO_TODOIST_UNCOMPLETABLE_EVENTS = 'calendar_to_todoist.uncompletable_events'
 
@@ -65,16 +64,10 @@ class CalendarToTodoistService:
         self.google_calendar = google_calendar
         self.item_to_event = {}
         self._pending_new_event_item_links = []
-        self.duration_labels = None
         self.active_project = self.todoist.get_project_by_name(
             get_storage().get_value(CALENDAR_TO_TODOIST_ACTIVE_PROJECT)
         )
 
-        duration_labels_config = get_storage().get_value(CALENDAR_TO_TODOIST_DURATION_LABELS, {})
-        self.duration_labels = [
-            (float(duration_limit), label)
-            for duration_limit, label in duration_labels_config.items()
-        ]
         self.attendee_labels = get_storage().get_value(CALENDAR_TO_TODOIST_ATTENDEE_LABELS, {})
         self.needs_action_label = get_storage().get_value(CALENDAR_TO_TODOIST_NEEDS_ACTION_LABEL)
         self.calendar_label = get_storage().get_value(CALENDAR_TO_TODOIST_LABEL)
@@ -136,15 +129,6 @@ class CalendarToTodoistService:
             else:
                 item.remove_label(self.needs_action_label)
 
-        if self.duration_labels:
-            for _, label in self.duration_labels:
-                item.remove_label(label)
-
-            duration = event_source.duration()
-            for duration_limit, label in self.duration_labels:
-                if duration <= duration_limit:
-                    item.add_label(label)
-                    break
         if self.attendee_labels:
             attendees = {
                 x['email'] for x in event_source.attendees() if x['responseStatus'] != 'declined'
