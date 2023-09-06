@@ -16,6 +16,7 @@ more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
+import logging
 from datetime import datetime
 from typing import Any, Dict
 
@@ -26,6 +27,7 @@ from tools_for_todoist.models.todoist import Todoist
 from tools_for_todoist.storage import get_storage
 
 NIGHT_OWL_DAY_SWITCH_HOUR = 'night_owl.day_switch_hour'
+logger = logging.getLogger(__name__)
 
 
 class NightOwlEnabler:
@@ -43,13 +45,18 @@ class NightOwlEnabler:
                 or item.get_due_string() is None
                 or 'every day' not in item.get_due_string()
             ):
+                logger.debug(f'NightOwl: Skipping {item} without every day due date')
                 continue
+
+            logger.info(f'NightOwl: Completed every day task: {item}')
             now = datetime.now(gettz(self._google_calendar.default_timezone))
             seconds_from_midnight = (now - now.replace(hour=0, minute=0, second=0)).total_seconds()
             if seconds_from_midnight / 3600 > self._day_switch_hour:
+                logger.info(f'NightOwl: Completed after day switch hour, skipping: {item}')
                 continue
 
             next_due = item.next_due_date().replace(year=now.year, month=now.month, day=now.day)
             item.set_due(next_date=next_due, due_string=item.get_due_string())
             should_sync |= item.save()
+            logger.info(f'NightOwl: Next due date set to {next_due} for {item}')
         return should_sync
