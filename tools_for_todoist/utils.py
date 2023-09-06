@@ -64,7 +64,7 @@ def retry_flaky_function(
     func, name, validate_result_func=None, on_failure_func=None, critical_errors=None
 ):
     retry_count = get_storage().get_value('global.retry_count', 5)
-    for attempt in range(1, retry_count + 1):
+    for attempt in range(retry_count + 1):
         try:
             result = func()
             if validate_result_func is not None and not validate_result_func(result):
@@ -75,11 +75,13 @@ def retry_flaky_function(
                 raise
             if on_failure_func is not None:
                 on_failure_func()
-            if attempt == 5:
+            if attempt == retry_count:
                 logger.exception(f'Failed to execute flaky function {name}', exc_info=e)
                 raise
-            plural_failure = 's' if attempt > 1 else ''
+            plural_failure = 's' if attempt > 0 else ''
             logger.warning(
-                f'Retrying flaky function {name} soon. {attempt} failure{plural_failure} so far.'
+                f'Retrying flaky function {name} soon. '
+                f'{attempt + 1} failure{plural_failure} so far.'
             )
-            sleep(10 * (attempt - 1))
+            sleep(10 * attempt)
+    raise ValueError(f'Invalid flaky function execution: {name}')
