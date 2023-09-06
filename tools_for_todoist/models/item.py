@@ -46,7 +46,7 @@ class TodoistItem:
         return self._raw
 
     @staticmethod
-    def from_raw(todoist, raw):
+    def from_raw(todoist, raw) -> 'TodoistItem':
         item = TodoistItem(todoist, raw['content'], raw['project_id'])
         item.id = raw['id']
         item.update_from_raw(raw)

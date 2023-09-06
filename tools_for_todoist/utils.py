@@ -24,6 +24,8 @@ from time import sleep
 
 from dateutil.tz import UTC
 
+from tools_for_todoist.storage import get_storage
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,7 +63,8 @@ def to_todoist_date(dt):
 def retry_flaky_function(
     func, name, validate_result_func=None, on_failure_func=None, critical_errors=None
 ):
-    for attempt in range(1, 6):
+    retry_count = get_storage().get_value('global.retry_count', 5)
+    for attempt in range(1, retry_count + 1):
         try:
             result = func()
             if validate_result_func is not None and not validate_result_func(result):
