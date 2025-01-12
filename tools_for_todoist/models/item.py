@@ -16,6 +16,7 @@ more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
+
 import copy
 import logging
 
@@ -117,6 +118,12 @@ class TodoistItem:
 
     def has_parent(self):
         return self._raw.get('parent_id') is not None
+
+    def parent(self):
+        parent_id = self._raw.get('parent_id')
+        if parent_id is None:
+            return None
+        return self.todoist.get_item_by_id(parent_id)
 
     def labels(self):
         return self._labels

@@ -17,17 +17,13 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 
-import json
 import logging
-import os
 from collections import defaultdict
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 from tools_for_todoist.models.event import CalendarEvent
+from tools_for_todoist.models.google_auth import GoogleAuth
 from tools_for_todoist.storage import get_storage
 from tools_for_todoist.utils import retry_flaky_function
 
@@ -41,29 +37,6 @@ SCOPES = [
 GOOGLE_CALENDAR_CREDENTIALS = 'google_calendar.credentials'
 GOOGLE_CALENDAR_TOKEN = 'google_calendar.token'
 GOOGLE_CALENDAR_CALENDAR_ID = 'google_calendar.calendar_id'
-
-
-def _save_credentials(token):
-    get_storage().set_value(GOOGLE_CALENDAR_TOKEN, json.loads(token.to_json()))
-
-
-def _do_auth():
-    storage = get_storage()
-    token_json = storage.get_value(GOOGLE_CALENDAR_TOKEN)
-    if token_json is not None:
-        token = Credentials.from_authorized_user_info(token_json)
-        if token.valid:
-            return token
-        if token.expired and token.refresh_token:
-            token.refresh(Request())
-            _save_credentials(token)
-            return token
-    flow = InstalledAppFlow.from_client_config(
-        storage.get_value(GOOGLE_CALENDAR_CREDENTIALS), SCOPES
-    )
-    token = flow.run_local_server(port=int(os.environ.get('PORT', 0)))
-    _save_credentials(token)
-    return token
 
 
 class GoogleCalendarSyncResult:
@@ -91,7 +64,11 @@ class GoogleCalendar:
         )
 
     def _recreate_api(self):
-        token = _do_auth()
+        token = GoogleAuth(
+            storage_credentials_key=GOOGLE_CALENDAR_CREDENTIALS,
+            storage_token_key=GOOGLE_CALENDAR_TOKEN,
+            scopes=SCOPES,
+        ).do_auth()
         self.api = build('calendar', 'v3', credentials=token, cache_discovery=False)
 
     def _process_raw_event(self, raw_event, sync_result):

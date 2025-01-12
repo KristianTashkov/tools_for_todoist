@@ -16,10 +16,12 @@ more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
+
 import argparse
 import json
 import subprocess
 
+from tools_for_todoist.app import DEFAULT_STORAGE, setup_storage
 from tools_for_todoist.models.google_calendar import (
     GOOGLE_CALENDAR_CALENDAR_ID,
     GOOGLE_CALENDAR_CREDENTIALS,
@@ -31,12 +33,8 @@ from tools_for_todoist.services.calendar_to_todoist import (
     CALENDAR_TO_TODOIST_ACTIVE_PROJECT,
     CALENDAR_TO_TODOIST_LABEL,
 )
-from tools_for_todoist.storage import (
-    DEFAULT_STORAGE,
-    LocalKeyValueStorage,
-    PostgresKeyValueStorage,
-    get_storage,
-)
+from tools_for_todoist.storage import get_storage
+from tools_for_todoist.storage.storage import LocalKeyValueStorage, PostgresKeyValueStorage
 
 
 def _get_heroku_postgres_link():
@@ -65,6 +63,7 @@ parser.add_argument(
 
 
 def manual_flow():
+    setup_storage()
     storage = get_storage()
     print('Enter Todoist API key:')
     todoist_key = input()

@@ -33,3 +33,4 @@ MANIFEST
 .vscode
 
 tools_for_todoist/storage/store.json
+tools_for_todoist/notebooks/
