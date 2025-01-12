@@ -16,6 +16,7 @@ more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
+
 from uuid import uuid4
 
 from tools_for_todoist.models.event import CalendarEvent

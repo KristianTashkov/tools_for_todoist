@@ -16,6 +16,7 @@ more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
+
 import logging
 import re
 from datetime import datetime, timedelta
@@ -304,7 +305,7 @@ class CalendarToTodoistService:
     def _process_todoist_sync(self, sync_result):
         should_sync = False
 
-        for item_id in sync_result['completed']:
+        for _, item_id in sync_result['completed']:
             should_sync |= self._process_completed_item(item_id)
         for old, new in sync_result['updated']:
             should_sync |= self._process_updated_item(old, new)

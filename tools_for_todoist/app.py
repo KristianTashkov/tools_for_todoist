@@ -16,6 +16,7 @@ more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
+
 import logging
 import os
 import time
@@ -26,6 +27,7 @@ from google.auth.exceptions import DefaultCredentialsError
 from tools_for_todoist.models.google_calendar import GoogleCalendar
 from tools_for_todoist.models.todoist import Todoist
 from tools_for_todoist.services.calendar_to_todoist import CalendarToTodoistService
+from tools_for_todoist.services.incentive_points import IncentivePoints
 from tools_for_todoist.services.night_owl_enabler import NightOwlEnabler
 from tools_for_todoist.storage import set_storage
 from tools_for_todoist.storage.storage import LocalKeyValueStorage, PostgresKeyValueStorage
@@ -66,6 +68,7 @@ def run_sync_service(logger):
     google_calendar = GoogleCalendar()
     calendar_service = CalendarToTodoistService(todoist, google_calendar)
     night_owl_enabler = NightOwlEnabler(todoist, google_calendar)
+    incentive_points = IncentivePoints(todoist, google_calendar.default_timezone)
     logger.info('Started syncing service.')
 
     while True:
@@ -77,6 +80,7 @@ def run_sync_service(logger):
             todoist_sync_result = todoist.sync()
             should_keep_syncing = calendar_service.on_todoist_sync(todoist_sync_result)
             should_keep_syncing |= night_owl_enabler.on_todoist_sync(todoist_sync_result)
+            incentive_points.on_todoist_sync(todoist_sync_result)
         time.sleep(10)
 
 

@@ -16,6 +16,7 @@ more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
+
 import logging
 from contextlib import ExitStack
 from tempfile import TemporaryDirectory
@@ -91,6 +92,7 @@ class Todoist:
         activity_result = self._activity_sync(limit=1)
         if activity_result['count']:
             self._last_completed = activity_result['events'][0]['id']
+        self.owner_id = self._initial_result['user']['id']
 
     def _new_completed(self):
         finished_processing = False
@@ -108,7 +110,8 @@ class Todoist:
                 if event['id'] == self._last_completed:
                     finished_processing = True
                     break
-                new_completed.add(event['object_id'])
+
+                new_completed.add((event['initiator_id'], event['object_id']))
         self._last_completed = first_event
         return new_completed
 

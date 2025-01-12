@@ -16,6 +16,7 @@ more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
+
 import logging
 from datetime import datetime
 from typing import Any, Dict
@@ -38,7 +39,7 @@ class NightOwlEnabler:
 
     def on_todoist_sync(self, sync_result: Dict[str, Any]) -> bool:
         should_sync = False
-        for item_id in sync_result['completed']:
+        for _, item_id in sync_result['completed']:
             item = self._todoist.get_item_by_id(item_id)
             if (
                 item is None
