@@ -59,7 +59,7 @@ class NightOwlEnablerTests(ServicesTestCase):
         night_owl_enabler = NightOwlEnabler(self._todoist_mock, self._google_calendar_mock)
 
         self._set_current_time(day=10, hour=23)
-        night_owl_enabler.on_todoist_sync({'completed': [test_item.id]})
+        night_owl_enabler.on_todoist_sync({'completed': [(None, test_item.id)]})
         self._todoist_mock.update_item.assert_not_called()
 
     def test_completed_before_midnight_date_only(self) -> None:
@@ -72,7 +72,7 @@ class NightOwlEnablerTests(ServicesTestCase):
         night_owl_enabler = NightOwlEnabler(self._todoist_mock, self._google_calendar_mock)
 
         self._set_current_time(day=10, hour=23)
-        night_owl_enabler.on_todoist_sync({'completed': [test_item.id]})
+        night_owl_enabler.on_todoist_sync({'completed': [(None, test_item.id)]})
         self._todoist_mock.update_item.assert_not_called()
 
     def test_completed_non_recurring(self) -> None:
@@ -80,7 +80,7 @@ class NightOwlEnablerTests(ServicesTestCase):
         night_owl_enabler = NightOwlEnabler(self._todoist_mock, self._google_calendar_mock)
 
         self._set_current_time(day=11, hour=1)
-        night_owl_enabler.on_todoist_sync({'completed': [test_item.id]})
+        night_owl_enabler.on_todoist_sync({'completed': [(None, test_item.id)]})
         self._todoist_mock.update_item.assert_not_called()
 
     def test_completed_non_every_day(self) -> None:
@@ -93,7 +93,7 @@ class NightOwlEnablerTests(ServicesTestCase):
         night_owl_enabler = NightOwlEnabler(self._todoist_mock, self._google_calendar_mock)
 
         self._set_current_time(day=11, hour=1)
-        night_owl_enabler.on_todoist_sync({'completed': [test_item.id]})
+        night_owl_enabler.on_todoist_sync({'completed': [(None, test_item.id)]})
         self._todoist_mock.update_item.assert_not_called()
 
     def test_completed_after_midnight(self) -> None:
@@ -106,7 +106,7 @@ class NightOwlEnablerTests(ServicesTestCase):
         night_owl_enabler = NightOwlEnabler(self._todoist_mock, self._google_calendar_mock)
 
         self._set_current_time(day=11, hour=1)
-        night_owl_enabler.on_todoist_sync({'completed': [test_item.id]})
+        night_owl_enabler.on_todoist_sync({'completed': [(None, test_item.id)]})
         self._todoist_mock.update_item.assert_called_once_with(
             test_item,
             due={
@@ -126,7 +126,7 @@ class NightOwlEnablerTests(ServicesTestCase):
         night_owl_enabler = NightOwlEnabler(self._todoist_mock, self._google_calendar_mock)
 
         self._set_current_time(day=11, hour=1)
-        night_owl_enabler.on_todoist_sync({'completed': [test_item.id]})
+        night_owl_enabler.on_todoist_sync({'completed': [(None, test_item.id)]})
         self._todoist_mock.update_item.assert_called_once_with(
             test_item,
             due={
@@ -146,7 +146,7 @@ class NightOwlEnablerTests(ServicesTestCase):
         night_owl_enabler = NightOwlEnabler(self._todoist_mock, self._google_calendar_mock)
 
         self._set_current_time(day=14, hour=1)
-        night_owl_enabler.on_todoist_sync({'completed': [test_item.id]})
+        night_owl_enabler.on_todoist_sync({'completed': [(None, test_item.id)]})
         self._todoist_mock.update_item.assert_called_once_with(
             test_item,
             due={
@@ -166,7 +166,7 @@ class NightOwlEnablerTests(ServicesTestCase):
         night_owl_enabler = NightOwlEnabler(self._todoist_mock, self._google_calendar_mock)
 
         self._set_current_time(day=15, hour=1)
-        night_owl_enabler.on_todoist_sync({'completed': [test_item.id]})
+        night_owl_enabler.on_todoist_sync({'completed': [(None, test_item.id)]})
         self._todoist_mock.update_item.assert_called_once_with(
             test_item,
             due={
@@ -187,7 +187,7 @@ class NightOwlEnablerTests(ServicesTestCase):
         night_owl_enabler = NightOwlEnabler(self._todoist_mock, self._google_calendar_mock)
 
         self._set_current_time(day=11, hour=1)
-        night_owl_enabler.on_todoist_sync({'completed': [test_item.id]})
+        night_owl_enabler.on_todoist_sync({'completed': [(None, test_item.id)]})
         self._todoist_mock.update_item.assert_called_once_with(
             test_item,
             due={
