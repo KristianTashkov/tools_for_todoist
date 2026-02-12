@@ -72,6 +72,8 @@ class GoogleCalendar:
         self.api = build('calendar', 'v3', credentials=token, cache_discovery=False)
 
     def _process_raw_event(self, raw_event, sync_result):
+        if raw_event.get('eventType') == 'workingLocation':
+            return
         if raw_event['status'] == 'cancelled':
             canceled_event = self._events.pop(raw_event['id'], None)
             sync_result.cancelled_events.append(

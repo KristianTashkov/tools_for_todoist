@@ -42,6 +42,7 @@ class TodoistItem:
         self._duration = None
         self._in_history = False
         self._labels = set()
+        self._last_set_description = None
 
     def raw(self):
         return self._raw
@@ -144,6 +145,7 @@ class TodoistItem:
 
     def save(self):
         if self.id is None:
+            self._last_set_description = self.description
             self._raw = self.todoist.add_item(self)
             self.id = self._raw['id']
             return True
@@ -153,8 +155,10 @@ class TodoistItem:
             logger.debug(f'{self.id}: updating title.')
             updated_rows['content'] = self.content
         if self.description != self._raw['description']:
-            logger.debug(f'{self.id}: updating description.')
-            updated_rows['description'] = self.description
+            if self.description != self._last_set_description:
+                logger.debug(f'{self.id}: updating description.')
+                updated_rows['description'] = self.description
+                self._last_set_description = self.description
         if self.priority != self._raw['priority']:
             logger.debug(
                 f'{self.id}: updating priority: {self._raw["priority"]} to {self.priority}'

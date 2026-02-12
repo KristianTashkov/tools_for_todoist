@@ -26,7 +26,6 @@ import requests
 from tools_for_todoist.models.google_calendar import GoogleCalendar
 from tools_for_todoist.models.todoist import Todoist
 from tools_for_todoist.services.calendar_to_todoist import CalendarToTodoistService
-from tools_for_todoist.services.incentive_points import IncentivePoints
 from tools_for_todoist.services.night_owl_enabler import NightOwlEnabler
 from tools_for_todoist.storage import KeyValueStorage, set_storage
 from tools_for_todoist.storage.storage import LocalKeyValueStorage, PostgresKeyValueStorage
@@ -62,7 +61,6 @@ def run_sync_service(logger):
     google_calendar = GoogleCalendar()
     calendar_service = CalendarToTodoistService(todoist, google_calendar)
     night_owl_enabler = NightOwlEnabler(todoist, google_calendar)
-    incentive_points = IncentivePoints(todoist, google_calendar.default_timezone)
     logger.info('Started syncing service.')
 
     while True:
@@ -75,7 +73,6 @@ def run_sync_service(logger):
             should_keep_syncing = False
             should_keep_syncing |= calendar_service.on_todoist_sync(todoist_sync_result)
             should_keep_syncing |= night_owl_enabler.on_todoist_sync(todoist_sync_result)
-            should_keep_syncing |= incentive_points.on_todoist_sync(todoist_sync_result)
         time.sleep(10)
 
 
@@ -87,26 +84,29 @@ def _send_slack_message(storage: KeyValueStorage, message: str) -> None:
     requests.post(slack_webhook_url, json=payload)
 
 
+STABLE_RUNNING_THRESHOLD = 300
+MAX_RESTART_DELAY = 300
+
+
 def main():
     storage = setup_storage()
     logger = setup_logger(os.environ.get('LOGGING_LEVEL', logging.DEBUG))
-    retry_count = 0
-    max_retries = 5
-    exception = None
-    while retry_count < max_retries:
+    restart_delay = 0
+    while True:
+        start_time = time.monotonic()
         try:
             run_sync_service(logger)
-            retry_count = 0
         except Exception as e:
-            exception = e
-            _send_slack_message(storage, f'TFT server restarting: {exception}')
-            retry_count += 1
-            if retry_count < max_retries:
-                logger.exception(
-                    f'Restarting app after exception! Retry {retry_count}.',
-                    exc_info=exception,
-                )
-    _send_slack_message(storage, f'TFT server crashed: {exception}')
+            elapsed = time.monotonic() - start_time
+            if elapsed >= STABLE_RUNNING_THRESHOLD:
+                restart_delay = 0
+            _send_slack_message(storage, f'TFT server restarting: {e}')
+            logger.exception(
+                f'Restarting app after exception! Delay {restart_delay}s.',
+                exc_info=e,
+            )
+            time.sleep(restart_delay)
+            restart_delay = min(max(restart_delay * 2, 1), MAX_RESTART_DELAY)
 
 
 if __name__ == '__main__':

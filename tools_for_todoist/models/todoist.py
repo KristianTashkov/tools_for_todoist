@@ -17,13 +17,12 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 
+import json
 import logging
-from contextlib import ExitStack
-from tempfile import TemporaryDirectory
-from typing import Optional
+import uuid
+from datetime import datetime, timedelta, timezone
 
 from requests import Session
-from todoist.api import SyncError, TodoistAPI
 
 from tools_for_todoist.models.item import TodoistItem
 from tools_for_todoist.storage import get_storage
@@ -32,52 +31,102 @@ from tools_for_todoist.utils import retry_flaky_function
 logger = logging.getLogger(__name__)
 
 TODOIST_API_KEY = 'todoist.api_key'
+SYNC_API_URL = 'https://api.todoist.com/api/v1/sync'
+ACTIVITIES_API_URL = 'https://api.todoist.com/api/v1/activities'
+COMPLETED_API_URL = 'https://api.todoist.com/api/v1/tasks/completed/by_completion_date'
+
+
+class SyncError(Exception):
+    pass
 
 
 class Todoist:
     def __init__(self):
-        self._exit_stack: Optional[ExitStack] = None
         self._recreate_api()
-        self.api.reset_state()
+        self._sync_token = '*'
+        self._command_queue = []
         self._items = {}
         self._projects = {}
         self._last_completed = None
         self._initial_sync()
 
     def _recreate_api(self):
-        if self._exit_stack is not None:
-            self._exit_stack.close()
-        self._exit_stack = ExitStack()
         token = get_storage().get_value(TODOIST_API_KEY)
-        headered_session = Session()
-        headered_session.headers['Authorization'] = f'Bearer {token}'
+        self._session = Session()
+        self._session.headers['Authorization'] = f'Bearer {token}'
 
-        new_temp_dir = self._exit_stack.enter_context(TemporaryDirectory())
-        self.api = TodoistAPI(token, session=headered_session, api_version='v9', cache=new_temp_dir)
+    def _do_sync(self, resource_types=None, commands=None):
+        data = {'sync_token': self._sync_token}
+        if resource_types is not None:
+            data['resource_types'] = json.dumps(resource_types)
+        if commands is not None:
+            data['commands'] = json.dumps(commands)
+        response = self._session.post(SYNC_API_URL, data=data)
+        response.raise_for_status()
+        result = response.json()
 
-    def _activity_sync(self, offset=0, limit=100):
+        if commands and 'sync_status' in result:
+            for cmd_uuid, status in result['sync_status'].items():
+                if isinstance(status, dict) and 'error' in status:
+                    raise SyncError(f'Command {cmd_uuid} failed: {status["error"]}')
+
+        if 'sync_token' in result:
+            self._sync_token = result['sync_token']
+        return result
+
+    def _add_command(self, command_type, args, temp_id=None):
+        command = {
+            'type': command_type,
+            'uuid': str(uuid.uuid4()),
+            'args': args,
+        }
+        if temp_id is not None:
+            command['temp_id'] = temp_id
+        self._command_queue.append(command)
+
+    def _activity_sync(self, cursor=None, limit=50):
         def activity_get_func():
-            return self.api.activity.get(
-                object_type='item',
-                event_type='completed',
-                offset=offset,
-                limit=limit,
-            )
+            params = {
+                'object_event_types': json.dumps(['item:completed']),
+                'limit': limit,
+            }
+            if cursor is not None:
+                params['cursor'] = cursor
+            response = self._session.get(ACTIVITIES_API_URL, params=params)
+            response.raise_for_status()
+            return response.json()
 
         return retry_flaky_function(
             activity_get_func,
             'todoist_activity_get',
-            validate_result_func=lambda x: x and 'count' in x and 'events' in x,
+            validate_result_func=lambda x: x and 'results' in x,
             on_failure_func=self._recreate_api,
         )
 
     def _update_projects(self, sync_result):
-        for project in sync_result['projects']:
+        for project in sync_result.get('projects', []):
             self._projects[project['id']] = project
 
+    def _fetch_completed_items(self, project_id, cursor=None, limit=200):
+        now = datetime.now(timezone.utc)
+        params = {
+            'project_id': project_id,
+            'since': (now - timedelta(days=89)).strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'until': now.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'limit': limit,
+        }
+        if cursor is not None:
+            params['cursor'] = cursor
+        response = self._session.get(COMPLETED_API_URL, params=params)
+        response.raise_for_status()
+        return response.json()
+
     def _initial_sync(self):
+        def do_initial_sync():
+            return self._do_sync(resource_types=['all'])
+
         self._initial_result = retry_flaky_function(
-            self.api.sync,
+            do_initial_sync,
             'todoist_initial_sync',
             on_failure_func=self._recreate_api,
             validate_result_func=lambda x: x and 'projects' in x and 'items' in x,
@@ -87,31 +136,38 @@ class Todoist:
         self._update_projects(self._initial_result)
         for project_id in self._projects.keys():
             # TODO(kris): Improve this completed logic or deprecate
-            for item in self.api.items.get_completed(project_id, limit=200):
+            result = self._fetch_completed_items(project_id)
+            for item in result.get('items', []):
                 self._items[item['id']] = TodoistItem.from_raw(self, item)
+            while result.get('next_cursor'):
+                result = self._fetch_completed_items(project_id, cursor=result['next_cursor'])
+                for item in result.get('items', []):
+                    self._items[item['id']] = TodoistItem.from_raw(self, item)
         activity_result = self._activity_sync(limit=1)
-        if activity_result['count']:
-            self._last_completed = activity_result['events'][0]['id']
+        if activity_result['results']:
+            self._last_completed = activity_result['results'][0]['id']
         self.owner_id = self._initial_result['user']['id']
 
     def _new_completed(self):
         finished_processing = False
-        offset = 0
+        cursor = None
         first_event = None
         new_completed = set()
 
         while not finished_processing:
-            activity_result = self._activity_sync(offset=offset)
-            offset += 100
-            finished_processing = offset > activity_result['count']
-            for event in activity_result['events']:
+            activity_result = self._activity_sync(cursor=cursor)
+            results = activity_result['results']
+            next_cursor = activity_result.get('next_cursor')
+            finished_processing = next_cursor is None
+            cursor = next_cursor
+            for event in results:
                 if first_event is None:
                     first_event = event['id']
                 if event['id'] == self._last_completed:
                     finished_processing = True
                     break
 
-                new_completed.add((event['initiator_id'], event['object_id']))
+                new_completed.add((event.get('initiator_id'), event['object_id']))
         self._last_completed = first_event
         return new_completed
 
@@ -120,19 +176,28 @@ class Todoist:
         new_items = []
         updated_items = []
         for item in raw_updated_items:
-            if item['is_deleted'] == 1:
+            if item.get('is_deleted'):
                 old_item = self._items.pop(item['id'], None)
                 if old_item is not None:
                     deleted_items.append(old_item)
             elif item['id'] not in self._items:
+                if 'content' not in item:
+                    continue
                 new_item = TodoistItem.from_raw(self, item)
                 self._items[new_item.id] = new_item
                 new_items.append(new_item)
             else:
-                old_item = TodoistItem.from_raw(self, self._items[item['id']].raw())
                 item_model = self.get_item_by_id(item['id'])
-                item_model.update_from_raw(item)
-                updated_items.append((old_item, item_model))
+                existing_raw = item_model.raw()
+                old_item = (
+                    TodoistItem.from_raw(self, existing_raw)
+                    if existing_raw and 'content' in existing_raw
+                    else None
+                )
+                merged_raw = {**(existing_raw or {}), **item}
+                item_model.update_from_raw(merged_raw)
+                if old_item is not None:
+                    updated_items.append((old_item, item_model))
         return {'deleted': deleted_items, 'created': new_items, 'updated': updated_items}
 
     def get_item_by_id(self, item_id: str) -> TodoistItem:
@@ -146,44 +211,59 @@ class Todoist:
 
     def create_label(self, name):
         logger.info(f'Creating label| {name}')
-        return self.api.labels.add(name)['id']
+        temp_id = str(uuid.uuid4())
+        self._add_command('label_add', {'name': name}, temp_id=temp_id)
+        result = self._commit()
+        return result.get('temp_id_mapping', {}).get(temp_id, temp_id)
 
     def add_item(self, item):
         logger.info(f'Adding item| {item}')
-        item_raw = self.api.items.add(
-            item.content,
-            project_id=item.project_id,
-            priority=item.priority,
-            due=item._due,
-            labels=list(item.labels()),
-        )
-        self._items[item_raw['id']] = item
-        return item_raw.data
+        temp_id = str(uuid.uuid4())
+        args = {
+            'content': item.content,
+            'project_id': item.project_id,
+            'priority': item.priority,
+            'labels': list(item.labels()),
+            'description': item.description,
+        }
+        if item._due is not None:
+            args['due'] = item._due
+        if item._duration is not None:
+            args['duration'] = item._duration
+        self._add_command('item_add', args, temp_id=temp_id)
+        self._items[temp_id] = item
+        return {'id': temp_id}
 
     def update_item(self, item, **kwargs):
         logger.info(f'Updating item| {item}')
-        self.api.items.update(item.id, **kwargs)
+        kwargs['id'] = item.id
+        self._add_command('item_update', kwargs)
 
     def delete_item(self, item):
         logger.info(f'Deleting item| {item}')
-        self.api.items.delete(item.id)
+        self._add_command('item_delete', {'id': item.id})
 
     def archive_item(self, item):
         logger.info(f'Archiving item| {item}')
-        self.api.items.complete(item.id)
+        self._add_command('item_close', {'id': item.id})
 
     def uncomplete_item(self, item):
         logger.info(f'Uncompleting item| {item}')
-        self.api.items.uncomplete(item.id)
+        self._add_command('item_uncomplete', {'id': item.id})
+
+    def _commit(self):
+        commands = self._command_queue.copy()
+        self._command_queue.clear()
+        return self._do_sync(commands=commands)
 
     def sync(self):
-        api_queue = self.api.queue
+        commands = self._command_queue.copy()
+        self._command_queue.clear()
 
         def api_sync():
-            if len(api_queue) > 0:
-                self.api.queue = api_queue.copy()
-                return self.api.commit()
-            return self.api.sync()
+            if commands:
+                return self._do_sync(resource_types=['all'], commands=commands)
+            return self._do_sync(resource_types=['all'])
 
         result = retry_flaky_function(
             api_sync,
