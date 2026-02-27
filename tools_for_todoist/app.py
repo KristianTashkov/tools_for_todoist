@@ -76,12 +76,14 @@ def run_sync_service(logger):
         time.sleep(10)
 
 
-def _send_slack_message(storage: KeyValueStorage, message: str) -> None:
-    slack_webhook_url = storage.get_value('logging.slack_webhook_url')
-    if slack_webhook_url is None:
+def _send_telegram_message(storage: KeyValueStorage, message: str) -> None:
+    bot_token = storage.get_value('logging.telegram_bot_token')
+    chat_id = storage.get_value('logging.telegram_chat_id')
+    if bot_token is None or chat_id is None:
         return
-    payload = {'text': message, 'username': 'tools_for_todoist'}
-    requests.post(slack_webhook_url, json=payload)
+    url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
+    payload = {'chat_id': chat_id, 'text': message}
+    requests.post(url, json=payload)
 
 
 STABLE_RUNNING_THRESHOLD = 300
@@ -100,7 +102,7 @@ def main():
             elapsed = time.monotonic() - start_time
             if elapsed >= STABLE_RUNNING_THRESHOLD:
                 restart_delay = 0
-            _send_slack_message(storage, f'TFT server restarting: {e}')
+            _send_telegram_message(storage, f'TFT server restarting: {e}')
             logger.exception(
                 f'Restarting app after exception! Delay {restart_delay}s.',
                 exc_info=e,
