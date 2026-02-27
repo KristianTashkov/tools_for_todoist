@@ -61,7 +61,7 @@ class Todoist:
             data['resource_types'] = json.dumps(resource_types)
         if commands is not None:
             data['commands'] = json.dumps(commands)
-        response = self._session.post(SYNC_API_URL, data=data)
+        response = self._session.post(SYNC_API_URL, data=data, timeout=10)
         response.raise_for_status()
         result = response.json()
 
@@ -92,7 +92,7 @@ class Todoist:
             }
             if cursor is not None:
                 params['cursor'] = cursor
-            response = self._session.get(ACTIVITIES_API_URL, params=params)
+            response = self._session.get(ACTIVITIES_API_URL, params=params, timeout=10)
             response.raise_for_status()
             return response.json()
 
@@ -117,7 +117,7 @@ class Todoist:
         }
         if cursor is not None:
             params['cursor'] = cursor
-        response = self._session.get(COMPLETED_API_URL, params=params)
+        response = self._session.get(COMPLETED_API_URL, params=params, timeout=10)
         response.raise_for_status()
         return response.json()
 
