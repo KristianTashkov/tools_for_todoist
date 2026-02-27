@@ -245,7 +245,7 @@ class Todoist:
 
     def archive_item(self, item):
         logger.info(f'Archiving item| {item}')
-        self._add_command('item_close', {'id': item.id})
+        self._add_command('item_complete', {'id': item.id})
 
     def uncomplete_item(self, item):
         logger.info(f'Uncompleting item| {item}')
