@@ -20,6 +20,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 import logging
 import os
 import time
+import traceback
 
 import requests
 
@@ -102,7 +103,8 @@ def main():
             elapsed = time.monotonic() - start_time
             if elapsed >= STABLE_RUNNING_THRESHOLD:
                 restart_delay = 0
-            _send_telegram_message(storage, f'TFT server restarting: {e}')
+            tb = ''.join(traceback.format_exception(e))
+            _send_telegram_message(storage, f'TFT server restarting:\n{tb}')
             logger.exception(
                 f'Restarting app after exception! Delay {restart_delay}s.',
                 exc_info=e,
