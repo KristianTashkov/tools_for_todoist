@@ -775,7 +775,7 @@ class TelegramBot:
                 )
                 choice = response.choices[0]
 
-                if choice.finish_reason == 'tool_calls':
+                if choice.message.tool_calls:
                     messages.append(choice.message)
                     for tool_call in choice.message.tool_calls:
                         args = json.loads(tool_call.function.arguments)
