@@ -251,6 +251,9 @@ class Todoist:
             args['due'] = item._due
         if item._duration is not None:
             args['duration'] = item._duration
+        raw = item.raw() or {}
+        if raw.get('parent_id') is not None:
+            args['parent_id'] = raw['parent_id']
         self._add_command('item_add', args, temp_id=temp_id)
         self._items[temp_id] = item
         return {'id': temp_id}
@@ -271,6 +274,10 @@ class Todoist:
     def uncomplete_item(self, item):
         logger.info(f'Uncompleting item| {item}')
         self._add_command('item_uncomplete', {'id': item.id})
+
+    def move_item(self, item, project_id):
+        logger.info(f'Moving item| {item} to project {project_id}')
+        self._add_command('item_move', {'id': item.id, 'project_id': project_id})
 
     def _commit(self):
         commands = self._command_queue.copy()

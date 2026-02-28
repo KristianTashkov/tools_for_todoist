@@ -79,7 +79,7 @@ TOOLS = [
                 'Perform one or more actions on existing tasks in a single batch call. '
                 'Each action specifies what to do and which task. Supported actions: '
                 'complete, uncomplete, reschedule, update_priority, add_label, '
-                'remove_label, assign.'
+                'remove_label, assign, move_to_project.'
             ),
             'parameters': {
                 'type': 'object',
@@ -100,6 +100,7 @@ TOOLS = [
                                         'add_label',
                                         'remove_label',
                                         'assign',
+                                        'move_to_project',
                                     ],
                                     'description': 'The action to perform',
                                 },
@@ -116,7 +117,7 @@ TOOLS = [
                                 },
                                 'priority': {
                                     'type': 'integer',
-                                    'description': 'For update_priority: 1 (normal) to 4 (urgent)',
+                                    'description': 'For update_priority: 1 (urgent) to 4 (normal)',
                                     'enum': [1, 2, 3, 4],
                                 },
                                 'label': {
@@ -128,6 +129,12 @@ TOOLS = [
                                     'description': (
                                         'For assign: name of person (partial match), '
                                         'or "unassign" to remove assignment'
+                                    ),
+                                },
+                                'project_name': {
+                                    'type': 'string',
+                                    'description': (
+                                        'For move_to_project: name of the target project'
                                     ),
                                 },
                             },
@@ -159,11 +166,17 @@ TOOLS = [
                                 },
                                 'project_name': {
                                     'type': 'string',
-                                    'description': 'Project to add to. Defaults to Inbox.',
+                                    'description': ('Project to add to. Defaults to Personal.'),
                                 },
                                 'section_name': {
                                     'type': 'string',
                                     'description': 'Section within the project',
+                                },
+                                'parent_id': {
+                                    'type': 'string',
+                                    'description': (
+                                        'ID of a parent task to create this as a subtask of'
+                                    ),
                                 },
                                 'due_string': {
                                     'type': 'string',
@@ -173,7 +186,7 @@ TOOLS = [
                                 },
                                 'priority': {
                                     'type': 'integer',
-                                    'description': 'Priority: 1 (normal) to 4 (urgent)',
+                                    'description': 'Priority: 1 (urgent) to 4 (normal)',
                                     'enum': [1, 2, 3, 4],
                                 },
                                 'labels': {
@@ -457,13 +470,19 @@ class TelegramBot:
             'id': item.id,
             'content': item.content,
             'project': project.get('name', 'Unknown'),
+            'project_id': item.project_id,
             'priority': item.priority,
             'labels': list(item.labels()),
         }
         if item.section_id:
+            result['section_id'] = item.section_id
             section = self.todoist._sections.get(item.section_id)
             if section:
                 result['section'] = section['name']
+        raw = item.raw() or {}
+        parent_id = raw.get('parent_id')
+        if parent_id:
+            result['parent_id'] = parent_id
         due_date = item.next_due_date()
         if due_date is not None:
             result['due_date'] = str(due_date)
@@ -628,6 +647,23 @@ class TelegramBot:
                                 'assigned_to': collaborator['full_name'],
                             }
                         )
+                elif action == 'move_to_project':
+                    project_name = action_spec.get('project_name')
+                    project = self.todoist.get_project_by_name(project_name)
+                    if project is None:
+                        results.append(
+                            {'task_id': task_id, 'error': f'project "{project_name}" not found'}
+                        )
+                        continue
+                    self.todoist.move_item(item, project['id'])
+                    results.append(
+                        {
+                            'task_id': task_id,
+                            'task': item.content,
+                            'action': 'moved',
+                            'project': project_name,
+                        }
+                    )
                 else:
                     results.append({'task_id': task_id, 'error': f'unknown action: {action}'})
             except Exception as e:
@@ -643,6 +679,7 @@ class TelegramBot:
                 content = task_spec['content']
                 project_name = task_spec.get('project_name')
                 section_name = task_spec.get('section_name')
+                parent_id = task_spec.get('parent_id')
                 due_string = task_spec.get('due_string')
                 priority = task_spec.get('priority', 1)
                 labels = task_spec.get('labels')
@@ -653,7 +690,11 @@ class TelegramBot:
                     if project:
                         project_id = project['id']
                 if project_id is None:
-                    project_id = self.todoist._initial_result['user']['inbox_project_id']
+                    personal = self.todoist.get_project_by_name('Personal')
+                    if personal:
+                        project_id = personal['id']
+                    else:
+                        project_id = self.todoist._initial_result['user']['inbox_project_id']
 
                 section_id = None
                 if section_name and project_id:
@@ -663,6 +704,9 @@ class TelegramBot:
 
                 item = TodoistItem(self.todoist, content, project_id)
                 item.section_id = section_id
+                if parent_id:
+                    item._raw = item._raw or {}
+                    item._raw['parent_id'] = parent_id
                 if due_string:
                     item._due = {'string': due_string}
                 item.priority = priority
@@ -745,6 +789,33 @@ class TelegramBot:
         ]
         if len(self._conversation_history) != before:
             self._save_history()
+
+    def _handle_service_command(self, text):
+        command = text.strip().lower()
+        if command == '/clear':
+            count = len(self._conversation_history)
+            self._conversation_history = []
+            self._save_history()
+            return f'🗑 Cleared {count} conversation history entries.'
+        elif command == '/memory':
+            if not self._memory:
+                return '🧠 Long-term memory is empty.'
+            lines = [f'🧠 **Long-term memory** ({len(self._memory)} entries):']
+            for key, value in self._memory.items():
+                lines.append(f'• {key}: {value}')
+            return '\n'.join(lines)
+        elif command == '/history':
+            if not self._conversation_history:
+                return '💬 Conversation history is empty.'
+            lines = [f'💬 **Conversation history** ({len(self._conversation_history)} entries):']
+            for entry in self._conversation_history:
+                ts = entry['timestamp'].strftime('%H:%M')
+                user_msg = entry['user']
+                assistant_msg = entry['assistant']
+                lines.append(f'[{ts}] User: {user_msg}')
+                lines.append(f'[{ts}] Bot: {assistant_msg}')
+            return '\n'.join(lines)
+        return None
 
     def _process_message(self, text):
         self._prune_history()
@@ -859,8 +930,13 @@ class TelegramBot:
 
             logger.info(f'Telegram bot received: {text[:100]}')
             had_messages = True
-            response = self._process_message(text)
-            self._send_message(response)
+
+            service_response = self._handle_service_command(text)
+            if service_response is not None:
+                self._send_message(service_response)
+            else:
+                response = self._process_message(text)
+                self._send_message(response)
 
         if self._should_send_proactive_update():
             self._send_proactive_update()
