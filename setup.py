@@ -42,6 +42,7 @@ setuptools.setup(
         'python-dateutil~=2.9',
         'psycopg2-binary~=2.9.7',
         'markdownify~=0.14',
+        'openai~=1.68',
     ],
     extras_require={'test': ['flake8==6.1.0', 'pytest==7.4.1', 'isort==5.12.0', 'black==23.7.0']},
     entry_points={

@@ -28,6 +28,7 @@ from tools_for_todoist.models.google_calendar import GoogleCalendar
 from tools_for_todoist.models.todoist import Todoist
 from tools_for_todoist.services.calendar_to_todoist import CalendarToTodoistService
 from tools_for_todoist.services.night_owl_enabler import NightOwlEnabler
+from tools_for_todoist.services.telegram_bot import TelegramBot
 from tools_for_todoist.storage import KeyValueStorage, set_storage
 from tools_for_todoist.storage.storage import LocalKeyValueStorage, PostgresKeyValueStorage
 
@@ -62,9 +63,12 @@ def run_sync_service(logger):
     google_calendar = GoogleCalendar()
     calendar_service = CalendarToTodoistService(todoist, google_calendar)
     night_owl_enabler = NightOwlEnabler(todoist, google_calendar)
+    telegram_bot = TelegramBot(todoist)
     logger.info('Started syncing service.')
 
     while True:
+        telegram_bot.poll()
+
         calendar_sync_result = google_calendar.sync()
         calendar_service.on_calendar_sync(calendar_sync_result)
 

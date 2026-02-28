@@ -47,6 +47,7 @@ class Todoist:
         self._command_queue = []
         self._items = {}
         self._projects = {}
+        self._collaborators = {}
         self._last_completed = None
         self._initial_sync()
 
@@ -106,6 +107,8 @@ class Todoist:
     def _update_projects(self, sync_result):
         for project in sync_result.get('projects', []):
             self._projects[project['id']] = project
+        for collaborator in sync_result.get('collaborators', []):
+            self._collaborators[collaborator['id']] = collaborator
 
     def _fetch_completed_items(self, project_id, cursor=None, limit=200):
         now = datetime.now(timezone.utc)
