@@ -124,10 +124,10 @@ TOOLS = [
                                     'description': 'For add_label/remove_label: label name',
                                 },
                                 'person_name': {
-                                    'type': ['string', 'null'],
+                                    'type': 'string',
                                     'description': (
                                         'For assign: name of person (partial match), '
-                                        'or null to unassign'
+                                        'or "unassign" to remove assignment'
                                     ),
                                 },
                             },
@@ -295,8 +295,22 @@ SYSTEM_PROMPT = """\
 You are a helpful Todoist assistant running on a personal server. \
 You help manage tasks: listing, rescheduling, completing, creating, and organizing them.
 
+The current time is {current_time}.
+
 When the user asks about tasks, use the list_tasks tool first to find relevant tasks, \
-then answer based on the results. When performing actions, confirm what you did.
+then answer based on the results.
+
+**IMPORTANT — How to make changes to tasks:**
+- To modify existing tasks (complete, uncomplete, reschedule, change priority, add/remove \
+labels, assign): ALWAYS use the **update_tasks** tool. It accepts an "actions" array so you \
+can batch multiple changes in a single call. Each action needs an "action" field (one of: \
+"complete", "uncomplete", "reschedule", "update_priority", "add_label", "remove_label", \
+"assign") and a "task_id" field, plus action-specific fields.
+- To create new tasks: ALWAYS use the **add_tasks** tool. It accepts a "tasks" array so you \
+can create multiple tasks in one call.
+- There are NO individual task-action tools. update_tasks and add_tasks are the ONLY ways \
+to make changes. Even for a single task, use these tools with a one-element array.
+- After making changes, confirm what you did.
 
 Keep responses concise - this is a Telegram chat. Use short paragraphs, not long lists \
 unless specifically asked. Use emoji sparingly for readability.
@@ -322,8 +336,8 @@ Be gentle at first, firmer if the gap between last completion and current due da
 **Shopping lists:** When asked to add items to a shopping/grocery project:
 1. First use list_tasks with include_completed=true for that project to check for existing \
 completed items with the same name
-2. If a matching completed item exists, use uncomplete_task to reactivate it instead of \
-creating a duplicate
+2. If a matching completed item exists, use update_tasks with action "uncomplete" to \
+reactivate it instead of creating a duplicate
 3. For new items, use list_sections to find the appropriate section and place items in the \
 right section (e.g. milk → Dairy, apples → Produce)
 
@@ -593,7 +607,7 @@ class TelegramBot:
                     )
                 elif action == 'assign':
                     person_name = action_spec.get('person_name')
-                    if person_name is None:
+                    if not person_name or person_name.lower() == 'unassign':
                         self.todoist.update_item(item, responsible_uid=None)
                         results.append(
                             {'task_id': task_id, 'task': item.content, 'action': 'unassigned'}
@@ -735,10 +749,13 @@ class TelegramBot:
     def _process_message(self, text):
         self._prune_history()
 
+        tz = gettz(self._user_timezone)
+        now = datetime.now(tz)
         messages = [
             {
                 'role': 'system',
                 'content': SYSTEM_PROMPT.format(
+                    current_time=now.strftime('%H:%M on %A, %B %d, %Y'),
                     user_timezone=self._user_timezone,
                     memories=self._format_memories(),
                 ),
