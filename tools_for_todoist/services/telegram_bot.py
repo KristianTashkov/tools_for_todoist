@@ -350,7 +350,7 @@ outdated entries. Use compact_history to replace recent conversation history wit
 summary when the user changes topic — this keeps context manageable. Your current memories:
 {memories}"""
 
-PROACTIVE_UPDATE_HOURS = {8, 12, 16, 20, 23}
+PROACTIVE_UPDATE_HOURS = {7, 11, 15, 19, 23}
 
 
 class TelegramBot:
