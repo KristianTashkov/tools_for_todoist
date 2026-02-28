@@ -849,11 +849,6 @@ class TelegramBot:
         response = self._process_message(prompt)
         self._send_message(response)
 
-    def send_startup_update(self):
-        if not self.is_configured:
-            return
-        self._send_proactive_update(context='startup')
-
     def poll(self):
         if not self.is_configured:
             return False
