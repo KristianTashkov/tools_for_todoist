@@ -775,7 +775,7 @@ class TelegramBot:
         messages.append({'role': 'user', 'content': text})
 
         try:
-            for _iteration in range(10):
+            for _iteration in range(100):
                 response = self._openai_client.chat.completions.create(
                     model=self._openai_model,
                     messages=messages,
