@@ -34,6 +34,7 @@ TELEGRAM_CHAT_ID_KEY = 'logging.telegram_chat_id'
 OPENAI_API_KEY = 'telegram_bot.openai_api_key'
 OPENAI_MODEL = 'telegram_bot.openai_model'
 BOT_MEMORY_KEY = 'telegram_bot.memory'
+BOT_HISTORY_KEY = 'telegram_bot.conversation_history'
 
 TOOLS = [
     {
@@ -428,7 +429,7 @@ class TelegramBot:
         self._openai_model = storage.get_value(OPENAI_MODEL)
         self._update_offset = None
         self._openai_client = None
-        self._conversation_history = []
+        self._conversation_history = self._load_history(storage)
         self._memory = storage.get_value(BOT_MEMORY_KEY, {})
         self._last_proactive_hour = None
         self._last_completed_cache = None
@@ -446,6 +447,29 @@ class TelegramBot:
     @property
     def is_configured(self):
         return self._openai_client is not None
+
+    @staticmethod
+    def _load_history(storage):
+        raw = storage.get_value(BOT_HISTORY_KEY, [])
+        history = []
+        for entry in raw:
+            try:
+                entry['timestamp'] = datetime.fromisoformat(entry['timestamp'])
+            except (KeyError, ValueError):
+                entry['timestamp'] = datetime.now(timezone.utc)
+            history.append(entry)
+        return history
+
+    def _save_history(self):
+        serializable = [
+            {
+                'user': e['user'],
+                'assistant': e['assistant'],
+                'timestamp': e['timestamp'].isoformat(),
+            }
+            for e in self._conversation_history
+        ]
+        get_storage().set_value(BOT_HISTORY_KEY, serializable)
 
     def _telegram_api(self, method, **kwargs):
         url = f'https://api.telegram.org/bot{self._bot_token}/{method}'
@@ -748,14 +772,18 @@ class TelegramBot:
                 'timestamp': datetime.now(timezone.utc),
             }
         ]
+        self._save_history()
         logger.info(f'Telegram bot compacted {entry_count} history entries into summary')
         return {'success': True, 'compacted_entries': entry_count}
 
     def _prune_history(self):
         cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+        before = len(self._conversation_history)
         self._conversation_history = [
             entry for entry in self._conversation_history if entry['timestamp'] >= cutoff
         ]
+        if len(self._conversation_history) != before:
+            self._save_history()
 
     def _process_message(self, text):
         self._prune_history()
@@ -806,6 +834,7 @@ class TelegramBot:
                         'timestamp': datetime.now(timezone.utc),
                     }
                 )
+                self._save_history()
                 return reply
 
             return 'Sorry, I hit the maximum number of steps. Please try a simpler request.'
