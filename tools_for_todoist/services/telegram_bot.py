@@ -792,6 +792,8 @@ class TelegramBot:
 
     def _handle_service_command(self, text):
         command = text.strip().lower()
+        if not command.startswith('/'):
+            return None
         if command == '/clear':
             count = len(self._conversation_history)
             self._conversation_history = []
@@ -815,7 +817,10 @@ class TelegramBot:
                 lines.append(f'[{ts}] User: {user_msg}')
                 lines.append(f'[{ts}] Bot: {assistant_msg}')
             return '\n'.join(lines)
-        return None
+        elif command == '/tasks':
+            return str(self._tool_list_tasks())
+        else:
+            return '❓ Unknown command'
 
     def _process_message(self, text):
         self._prune_history()
