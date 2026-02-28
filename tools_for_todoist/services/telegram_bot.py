@@ -866,7 +866,9 @@ class TelegramBot:
                     messages.append(choice.message)
                     for tool_call in choice.message.tool_calls:
                         args = json.loads(tool_call.function.arguments)
-                        logger.info(f'Telegram bot tool call: {tool_call.function.name}({args})')
+                        bot_tool_call_message = f'Telegram bot tool call: {tool_call.function.name}({args})'
+                        logger.info(bot_tool_call_message)
+                        self._send_message(bot_tool_call_message)
                         result = self._execute_tool(tool_call.function.name, args)
                         messages.append(
                             {
