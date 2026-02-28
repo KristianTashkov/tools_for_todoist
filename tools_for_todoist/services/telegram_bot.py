@@ -74,172 +74,119 @@ TOOLS = [
     {
         'type': 'function',
         'function': {
-            'name': 'reschedule_task',
+            'name': 'update_tasks',
             'description': (
-                'Reschedule a task to a new due date. For recurring tasks, this only changes '
-                'the next occurrence date without modifying the recurrence rule. '
-                'Use a date or datetime string (e.g. "2026-03-15", "2026-03-15T10:00:00").'
+                'Perform one or more actions on existing tasks in a single batch call. '
+                'Each action specifies what to do and which task. Supported actions: '
+                'complete, uncomplete, reschedule, update_priority, add_label, '
+                'remove_label, assign.'
             ),
             'parameters': {
                 'type': 'object',
                 'properties': {
-                    'task_id': {
-                        'type': 'string',
-                        'description': 'The ID of the task to reschedule',
-                    },
-                    'due_date': {
-                        'type': 'string',
-                        'description': (
-                            'The new due date in ISO format. Use YYYY-MM-DD for all-day tasks '
-                            'or YYYY-MM-DDTHH:MM:SS for tasks with a specific time. '
-                            'Times should be in the user\'s timezone.'
-                        ),
-                    },
-                },
-                'required': ['task_id', 'due_date'],
-            },
-        },
-    },
-    {
-        'type': 'function',
-        'function': {
-            'name': 'complete_task',
-            'description': 'Mark a task as completed.',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'task_id': {
-                        'type': 'string',
-                        'description': 'The ID of the task to complete',
-                    },
-                },
-                'required': ['task_id'],
-            },
-        },
-    },
-    {
-        'type': 'function',
-        'function': {
-            'name': 'uncomplete_task',
-            'description': (
-                'Uncomplete a previously completed task, making it active again. '
-                'Use for shopping lists to reactivate items instead of creating duplicates.'
-            ),
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'task_id': {
-                        'type': 'string',
-                        'description': 'The ID of the completed task to uncomplete',
-                    },
-                },
-                'required': ['task_id'],
-            },
-        },
-    },
-    {
-        'type': 'function',
-        'function': {
-            'name': 'update_task_priority',
-            'description': ('Update the priority of a task. Priority 1 is normal, 4 is urgent.'),
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'task_id': {
-                        'type': 'string',
-                        'description': 'The ID of the task to update',
-                    },
-                    'priority': {
-                        'type': 'integer',
-                        'description': 'Priority level: 1 (normal) to 4 (urgent)',
-                        'enum': [1, 2, 3, 4],
-                    },
-                },
-                'required': ['task_id', 'priority'],
-            },
-        },
-    },
-    {
-        'type': 'function',
-        'function': {
-            'name': 'add_task',
-            'description': 'Create a new task in Todoist.',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'content': {
-                        'type': 'string',
-                        'description': 'The text/title of the task',
-                    },
-                    'project_name': {
-                        'type': 'string',
-                        'description': 'Project to add the task to. Defaults to Inbox.',
-                    },
-                    'section_name': {
-                        'type': 'string',
-                        'description': (
-                            'Section within the project to add the task to. '
-                            'Use list_sections to find available sections.'
-                        ),
-                    },
-                    'due_string': {
-                        'type': 'string',
-                        'description': 'Natural language due date (e.g. "tomorrow at 10:00")',
-                    },
-                    'priority': {
-                        'type': 'integer',
-                        'description': 'Priority: 1 (normal) to 4 (urgent)',
-                        'enum': [1, 2, 3, 4],
-                    },
-                    'labels': {
+                    'actions': {
                         'type': 'array',
-                        'items': {'type': 'string'},
-                        'description': 'List of label names to assign',
+                        'description': 'List of actions to perform',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'action': {
+                                    'type': 'string',
+                                    'enum': [
+                                        'complete',
+                                        'uncomplete',
+                                        'reschedule',
+                                        'update_priority',
+                                        'add_label',
+                                        'remove_label',
+                                        'assign',
+                                    ],
+                                    'description': 'The action to perform',
+                                },
+                                'task_id': {
+                                    'type': 'string',
+                                    'description': 'The ID of the task',
+                                },
+                                'due_date': {
+                                    'type': 'string',
+                                    'description': (
+                                        'For reschedule: new due date in ISO format '
+                                        '(YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS in user tz)'
+                                    ),
+                                },
+                                'priority': {
+                                    'type': 'integer',
+                                    'description': 'For update_priority: 1 (normal) to 4 (urgent)',
+                                    'enum': [1, 2, 3, 4],
+                                },
+                                'label': {
+                                    'type': 'string',
+                                    'description': 'For add_label/remove_label: label name',
+                                },
+                                'person_name': {
+                                    'type': ['string', 'null'],
+                                    'description': (
+                                        'For assign: name of person (partial match), '
+                                        'or null to unassign'
+                                    ),
+                                },
+                            },
+                            'required': ['action', 'task_id'],
+                        },
                     },
                 },
-                'required': ['content'],
+                'required': ['actions'],
             },
         },
     },
     {
         'type': 'function',
         'function': {
-            'name': 'add_label_to_task',
-            'description': 'Add a label to an existing task.',
+            'name': 'add_tasks',
+            'description': 'Create one or more new tasks in Todoist in a single batch call.',
             'parameters': {
                 'type': 'object',
                 'properties': {
-                    'task_id': {
-                        'type': 'string',
-                        'description': 'The ID of the task',
-                    },
-                    'label': {
-                        'type': 'string',
-                        'description': 'The label name to add',
+                    'tasks': {
+                        'type': 'array',
+                        'description': 'List of tasks to create',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'content': {
+                                    'type': 'string',
+                                    'description': 'The text/title of the task',
+                                },
+                                'project_name': {
+                                    'type': 'string',
+                                    'description': 'Project to add to. Defaults to Inbox.',
+                                },
+                                'section_name': {
+                                    'type': 'string',
+                                    'description': 'Section within the project',
+                                },
+                                'due_string': {
+                                    'type': 'string',
+                                    'description': (
+                                        'Natural language due date (e.g. "tomorrow at 10:00")'
+                                    ),
+                                },
+                                'priority': {
+                                    'type': 'integer',
+                                    'description': 'Priority: 1 (normal) to 4 (urgent)',
+                                    'enum': [1, 2, 3, 4],
+                                },
+                                'labels': {
+                                    'type': 'array',
+                                    'items': {'type': 'string'},
+                                    'description': 'List of label names to assign',
+                                },
+                            },
+                            'required': ['content'],
+                        },
                     },
                 },
-                'required': ['task_id', 'label'],
-            },
-        },
-    },
-    {
-        'type': 'function',
-        'function': {
-            'name': 'remove_label_from_task',
-            'description': 'Remove a label from an existing task.',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'task_id': {
-                        'type': 'string',
-                        'description': 'The ID of the task',
-                    },
-                    'label': {
-                        'type': 'string',
-                        'description': 'The label name to remove',
-                    },
-                },
-                'required': ['task_id', 'label'],
+                'required': ['tasks'],
             },
         },
     },
@@ -285,33 +232,6 @@ TOOLS = [
                     },
                 },
                 'required': ['key'],
-            },
-        },
-    },
-    {
-        'type': 'function',
-        'function': {
-            'name': 'assign_task',
-            'description': (
-                'Assign a task to a collaborator by name, or unassign by passing null. '
-                'Use list_collaborators first if you need to find the right person.'
-            ),
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'task_id': {
-                        'type': 'string',
-                        'description': 'The ID of the task',
-                    },
-                    'person_name': {
-                        'type': ['string', 'null'],
-                        'description': (
-                            'Name of the person to assign to (partial match supported), '
-                            'or null to unassign'
-                        ),
-                    },
-                },
-                'required': ['task_id', 'person_name'],
             },
         },
     },
@@ -559,26 +479,14 @@ class TelegramBot:
     def _execute_tool(self, name, args):
         if name == 'list_tasks':
             return self._tool_list_tasks(**args)
-        elif name == 'reschedule_task':
-            return self._tool_reschedule_task(**args)
-        elif name == 'complete_task':
-            return self._tool_complete_task(**args)
-        elif name == 'uncomplete_task':
-            return self._tool_uncomplete_task(**args)
-        elif name == 'update_task_priority':
-            return self._tool_update_priority(**args)
-        elif name == 'add_task':
-            return self._tool_add_task(**args)
-        elif name == 'add_label_to_task':
-            return self._tool_add_label(**args)
-        elif name == 'remove_label_from_task':
-            return self._tool_remove_label(**args)
+        elif name == 'update_tasks':
+            return self._tool_update_tasks(**args)
+        elif name == 'add_tasks':
+            return self._tool_add_tasks(**args)
         elif name == 'save_memory':
             return self._tool_save_memory(**args)
         elif name == 'delete_memory':
             return self._tool_delete_memory(**args)
-        elif name == 'assign_task':
-            return self._tool_assign_task(**args)
         elif name == 'list_collaborators':
             return self._tool_list_collaborators()
         elif name == 'list_sections':
@@ -608,93 +516,150 @@ class TelegramBot:
             tasks.append(task_dict)
         return {'tasks': tasks, 'count': len(tasks)}
 
-    def _tool_reschedule_task(self, task_id, due_date):
-        item = self.todoist.get_item_by_id(task_id)
-        if item is None:
-            return {'error': f'Task {task_id} not found'}
-        new_due = {'date': due_date}
-        if item._due:
-            if item._due.get('string'):
-                new_due['string'] = item._due['string']
-            if item._due.get('timezone'):
-                new_due['timezone'] = item._due['timezone']
-        self.todoist.update_item(item, due=new_due)
-        return {'success': True, 'task': item.content, 'new_due_date': due_date}
+    def _tool_update_tasks(self, actions):
+        results = []
+        for action_spec in actions:
+            action = action_spec.get('action')
+            task_id = action_spec.get('task_id')
+            item = self.todoist.get_item_by_id(task_id)
+            if item is None:
+                results.append({'task_id': task_id, 'error': 'not found'})
+                continue
+            try:
+                if action == 'complete':
+                    item.archive()
+                    results.append(
+                        {'task_id': task_id, 'task': item.content, 'action': 'completed'}
+                    )
+                elif action == 'uncomplete':
+                    if not item.is_completed():
+                        results.append({'task_id': task_id, 'error': 'not completed'})
+                        continue
+                    item.uncomplete()
+                    results.append(
+                        {'task_id': task_id, 'task': item.content, 'action': 'uncompleted'}
+                    )
+                elif action == 'reschedule':
+                    due_date = action_spec.get('due_date')
+                    new_due = {'date': due_date}
+                    if item._due:
+                        if item._due.get('string'):
+                            new_due['string'] = item._due['string']
+                        if item._due.get('timezone'):
+                            new_due['timezone'] = item._due['timezone']
+                    self.todoist.update_item(item, due=new_due)
+                    results.append(
+                        {
+                            'task_id': task_id,
+                            'task': item.content,
+                            'action': 'rescheduled',
+                            'due_date': due_date,
+                        }
+                    )
+                elif action == 'update_priority':
+                    priority = action_spec.get('priority')
+                    self.todoist.update_item(item, priority=priority)
+                    results.append(
+                        {
+                            'task_id': task_id,
+                            'task': item.content,
+                            'action': 'priority_updated',
+                            'priority': priority,
+                        }
+                    )
+                elif action == 'add_label':
+                    label = action_spec.get('label')
+                    item.add_label(label)
+                    item.save()
+                    results.append(
+                        {
+                            'task_id': task_id,
+                            'task': item.content,
+                            'action': 'label_added',
+                            'label': label,
+                        }
+                    )
+                elif action == 'remove_label':
+                    label = action_spec.get('label')
+                    item.remove_label(label)
+                    item.save()
+                    results.append(
+                        {
+                            'task_id': task_id,
+                            'task': item.content,
+                            'action': 'label_removed',
+                            'label': label,
+                        }
+                    )
+                elif action == 'assign':
+                    person_name = action_spec.get('person_name')
+                    if person_name is None:
+                        self.todoist.update_item(item, responsible_uid=None)
+                        results.append(
+                            {'task_id': task_id, 'task': item.content, 'action': 'unassigned'}
+                        )
+                    else:
+                        collaborator = self._find_collaborator_by_name(person_name)
+                        if collaborator is None:
+                            results.append(
+                                {'task_id': task_id, 'error': f'no collaborator "{person_name}"'}
+                            )
+                            continue
+                        self.todoist.update_item(item, responsible_uid=collaborator['id'])
+                        results.append(
+                            {
+                                'task_id': task_id,
+                                'task': item.content,
+                                'action': 'assigned',
+                                'assigned_to': collaborator['full_name'],
+                            }
+                        )
+                else:
+                    results.append({'task_id': task_id, 'error': f'unknown action: {action}'})
+            except Exception as e:
+                results.append({'task_id': task_id, 'error': str(e)})
+        return {'results': results}
 
-    def _tool_complete_task(self, task_id):
-        item = self.todoist.get_item_by_id(task_id)
-        if item is None:
-            return {'error': f'Task {task_id} not found'}
-        item.archive()
-        return {'success': True, 'task': item.content}
-
-    def _tool_uncomplete_task(self, task_id):
-        item = self.todoist.get_item_by_id(task_id)
-        if item is None:
-            return {'error': f'Task {task_id} not found'}
-        if not item.is_completed():
-            return {'error': f'Task "{item.content}" is not completed'}
-        item.uncomplete()
-        return {'success': True, 'task': item.content}
-
-    def _tool_update_priority(self, task_id, priority):
-        item = self.todoist.get_item_by_id(task_id)
-        if item is None:
-            return {'error': f'Task {task_id} not found'}
-        self.todoist.update_item(item, priority=priority)
-        return {'success': True, 'task': item.content, 'priority': priority}
-
-    def _tool_add_task(
-        self,
-        content,
-        project_name=None,
-        section_name=None,
-        due_string=None,
-        priority=1,
-        labels=None,
-    ):
+    def _tool_add_tasks(self, tasks):
         from tools_for_todoist.models.item import TodoistItem
 
-        project_id = None
-        if project_name:
-            project = self.todoist.get_project_by_name(project_name)
-            if project:
-                project_id = project['id']
-        if project_id is None:
-            project_id = self.todoist._initial_result['user']['inbox_project_id']
+        results = []
+        for task_spec in tasks:
+            try:
+                content = task_spec['content']
+                project_name = task_spec.get('project_name')
+                section_name = task_spec.get('section_name')
+                due_string = task_spec.get('due_string')
+                priority = task_spec.get('priority', 1)
+                labels = task_spec.get('labels')
 
-        section_id = None
-        if section_name and project_id:
-            section = self.todoist.get_section_by_name(project_id, section_name)
-            if section:
-                section_id = section['id']
+                project_id = None
+                if project_name:
+                    project = self.todoist.get_project_by_name(project_name)
+                    if project:
+                        project_id = project['id']
+                if project_id is None:
+                    project_id = self.todoist._initial_result['user']['inbox_project_id']
 
-        item = TodoistItem(self.todoist, content, project_id)
-        item.section_id = section_id
-        if due_string:
-            item._due = {'string': due_string}
-        item.priority = priority
-        if labels:
-            for label in labels:
-                item.add_label(label)
-        item.save()
-        return {'success': True, 'task': content, 'id': item.id}
+                section_id = None
+                if section_name and project_id:
+                    section = self.todoist.get_section_by_name(project_id, section_name)
+                    if section:
+                        section_id = section['id']
 
-    def _tool_add_label(self, task_id, label):
-        item = self.todoist.get_item_by_id(task_id)
-        if item is None:
-            return {'error': f'Task {task_id} not found'}
-        item.add_label(label)
-        item.save()
-        return {'success': True, 'task': item.content, 'label': label}
-
-    def _tool_remove_label(self, task_id, label):
-        item = self.todoist.get_item_by_id(task_id)
-        if item is None:
-            return {'error': f'Task {task_id} not found'}
-        item.remove_label(label)
-        item.save()
-        return {'success': True, 'task': item.content, 'label': label}
+                item = TodoistItem(self.todoist, content, project_id)
+                item.section_id = section_id
+                if due_string:
+                    item._due = {'string': due_string}
+                item.priority = priority
+                if labels:
+                    for label in labels:
+                        item.add_label(label)
+                item.save()
+                results.append({'success': True, 'task': content, 'id': item.id})
+            except Exception as e:
+                results.append({'task': task_spec.get('content', '?'), 'error': str(e)})
+        return {'results': results}
 
     def _find_collaborator_by_name(self, name):
         name_lower = name.lower()
@@ -702,24 +667,6 @@ class TelegramBot:
             if name_lower in collab.get('full_name', '').lower():
                 return collab
         return None
-
-    def _tool_assign_task(self, task_id, person_name):
-        item = self.todoist.get_item_by_id(task_id)
-        if item is None:
-            return {'error': f'Task {task_id} not found'}
-        if person_name is None:
-            self.todoist.update_item(item, responsible_uid=None)
-            return {'success': True, 'task': item.content, 'assigned_to': None}
-        collaborator = self._find_collaborator_by_name(person_name)
-        if collaborator is None:
-            available = [c.get('full_name') for c in self.todoist._collaborators.values()]
-            return {'error': f'No collaborator matching "{person_name}"', 'available': available}
-        self.todoist.update_item(item, responsible_uid=collaborator['id'])
-        return {
-            'success': True,
-            'task': item.content,
-            'assigned_to': collaborator['full_name'],
-        }
 
     def _tool_list_collaborators(self):
         collaborators = [
