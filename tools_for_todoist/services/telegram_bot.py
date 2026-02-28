@@ -22,6 +22,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 import requests
+from dateutil.tz import gettz
 from openai import OpenAI
 
 from tools_for_todoist.storage import get_storage
@@ -57,6 +58,13 @@ TOOLS = [
                     'with_due_date_only': {
                         'type': 'boolean',
                         'description': 'If true, only return tasks that have a due date',
+                    },
+                    'include_completed': {
+                        'type': 'boolean',
+                        'description': (
+                            'If true, include completed tasks. Useful for shopping lists '
+                            'to find items that can be uncompleted instead of re-created.'
+                        ),
                     },
                 },
             },
@@ -111,6 +119,26 @@ TOOLS = [
     {
         'type': 'function',
         'function': {
+            'name': 'uncomplete_task',
+            'description': (
+                'Uncomplete a previously completed task, making it active again. '
+                'Use for shopping lists to reactivate items instead of creating duplicates.'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'task_id': {
+                        'type': 'string',
+                        'description': 'The ID of the completed task to uncomplete',
+                    },
+                },
+                'required': ['task_id'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
             'name': 'update_task_priority',
             'description': ('Update the priority of a task. Priority 1 is normal, 4 is urgent.'),
             'parameters': {
@@ -145,6 +173,13 @@ TOOLS = [
                     'project_name': {
                         'type': 'string',
                         'description': 'Project to add the task to. Defaults to Inbox.',
+                    },
+                    'section_name': {
+                        'type': 'string',
+                        'description': (
+                            'Section within the project to add the task to. '
+                            'Use list_sections to find available sections.'
+                        ),
                     },
                     'due_string': {
                         'type': 'string',
@@ -290,6 +325,26 @@ TOOLS = [
     {
         'type': 'function',
         'function': {
+            'name': 'list_sections',
+            'description': (
+                'List sections in a project. Useful for grocery/shopping lists where '
+                'items are organized by store section (e.g. Produce, Dairy, Frozen).'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'project_name': {
+                        'type': 'string',
+                        'description': 'Name of the project to list sections for',
+                    },
+                },
+                'required': ['project_name'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
             'name': 'compact_history',
             'description': (
                 'Replace the recent conversation history with a short summary. '
@@ -333,11 +388,34 @@ The user's timezone is {user_timezone}. Task due dates in tool results may inclu
 user's timezone. If a task's timezone differs from the user's, convert it and show the \
 time in the user's timezone.
 
+**Proactive updates:** You periodically receive automated update requests. When you get one:
+- Use list_tasks with with_due_date_only=true to review tasks
+- Highlight meetings (calendar label) and urgent (priority 1) items prominently
+- For overdue tasks, be direct and firm
+- Recurring tasks include a 'last_completed_at' field showing when they were last completed. \
+Use this to detect procrastination: if a task's due date keeps being pushed forward but \
+last_completed_at is far in the past (or missing), the user is likely procrastinating. \
+Be gentle at first, firmer if the gap between last completion and current due date is large
+- Keep updates brief and actionable
+
+**Shopping lists:** When asked to add items to a shopping/grocery project:
+1. First use list_tasks with include_completed=true for that project to check for existing \
+completed items with the same name
+2. If a matching completed item exists, use uncomplete_task to reactivate it instead of \
+creating a duplicate
+3. For new items, use list_sections to find the appropriate section and place items in the \
+right section (e.g. milk → Dairy, apples → Produce)
+
+**Sections:** Tasks can belong to sections within projects. When adding tasks to projects \
+that use sections, always check list_sections first and assign the appropriate section.
+
 You have persistent long-term memory. Use save_memory to remember user preferences, \
 instructions, or anything important for future conversations. Use delete_memory to remove \
 outdated entries. Use compact_history to replace recent conversation history with a short \
 summary when the user changes topic — this keeps context manageable. Your current memories:
 {memories}"""
+
+PROACTIVE_UPDATE_HOURS = {8, 12, 16, 20, 23}
 
 
 class TelegramBot:
@@ -352,6 +430,9 @@ class TelegramBot:
         self._openai_client = None
         self._conversation_history = []
         self._memory = storage.get_value(BOT_MEMORY_KEY, {})
+        self._last_proactive_hour = None
+        self._last_completed_cache = None
+        self._last_completed_cache_time = None
         self._user_timezone = (
             todoist._initial_result.get('user', {}).get('tz_info', {}).get('timezone', 'UTC')
         )
@@ -389,6 +470,29 @@ class TelegramBot:
             logger.warning(f'Telegram getUpdates failed: {e}')
             return []
 
+    def _get_last_completed_lookup(self):
+        now = datetime.now(timezone.utc)
+        if (
+            self._last_completed_cache is not None
+            and self._last_completed_cache_time
+            and (now - self._last_completed_cache_time).total_seconds() < 60
+        ):
+            return self._last_completed_cache
+        lookup = {}
+        for item in self.todoist._items.values():
+            if not item.is_completed():
+                continue
+            raw = item.raw() or {}
+            completed_at = raw.get('completed_at')
+            if not completed_at:
+                continue
+            key = (item.content.lower().strip(), item.project_id)
+            if key not in lookup or completed_at > lookup[key]:
+                lookup[key] = completed_at
+        self._last_completed_cache = lookup
+        self._last_completed_cache_time = now
+        return lookup
+
     def _task_to_dict(self, item):
         project = self.todoist._projects.get(item.project_id, {})
         result = {
@@ -398,6 +502,10 @@ class TelegramBot:
             'priority': item.priority,
             'labels': list(item.labels()),
         }
+        if item.section_id:
+            section = self.todoist._sections.get(item.section_id)
+            if section:
+                result['section'] = section['name']
         due_date = item.next_due_date()
         if due_date is not None:
             result['due_date'] = str(due_date)
@@ -406,7 +514,18 @@ class TelegramBot:
             result['due_string'] = due_string
         if item._due and item._due.get('timezone'):
             result['timezone'] = item._due['timezone']
+        if item.is_recurring():
+            result['is_recurring'] = True
         raw = item.raw() or {}
+        completed_at = raw.get('completed_at')
+        if completed_at:
+            result['completed_at'] = completed_at
+        elif item.is_recurring() and not item.is_completed():
+            lookup = self._get_last_completed_lookup()
+            key = (item.content.lower().strip(), item.project_id)
+            last_completed = lookup.get(key)
+            if last_completed:
+                result['last_completed_at'] = last_completed
         responsible_uid = raw.get('responsible_uid')
         if responsible_uid:
             collaborator = self.todoist._collaborators.get(responsible_uid, {})
@@ -420,6 +539,8 @@ class TelegramBot:
             return self._tool_reschedule_task(**args)
         elif name == 'complete_task':
             return self._tool_complete_task(**args)
+        elif name == 'uncomplete_task':
+            return self._tool_uncomplete_task(**args)
         elif name == 'update_task_priority':
             return self._tool_update_priority(**args)
         elif name == 'add_task':
@@ -436,14 +557,18 @@ class TelegramBot:
             return self._tool_assign_task(**args)
         elif name == 'list_collaborators':
             return self._tool_list_collaborators()
+        elif name == 'list_sections':
+            return self._tool_list_sections(**args)
         elif name == 'compact_history':
             return self._tool_compact_history(**args)
         return {'error': f'Unknown tool: {name}'}
 
-    def _tool_list_tasks(self, project_name=None, label=None, with_due_date_only=False):
+    def _tool_list_tasks(
+        self, project_name=None, label=None, with_due_date_only=False, include_completed=False
+    ):
         tasks = []
         for item in self.todoist._items.values():
-            if item.is_completed():
+            if item.is_completed() and not include_completed:
                 continue
             if project_name is not None:
                 project = self.todoist._projects.get(item.project_id, {})
@@ -453,7 +578,10 @@ class TelegramBot:
                 continue
             if with_due_date_only and item.next_due_date() is None:
                 continue
-            tasks.append(self._task_to_dict(item))
+            task_dict = self._task_to_dict(item)
+            if item.is_completed():
+                task_dict['completed'] = True
+            tasks.append(task_dict)
         return {'tasks': tasks, 'count': len(tasks)}
 
     def _tool_reschedule_task(self, task_id, due_date):
@@ -476,6 +604,15 @@ class TelegramBot:
         item.archive()
         return {'success': True, 'task': item.content}
 
+    def _tool_uncomplete_task(self, task_id):
+        item = self.todoist.get_item_by_id(task_id)
+        if item is None:
+            return {'error': f'Task {task_id} not found'}
+        if not item.is_completed():
+            return {'error': f'Task "{item.content}" is not completed'}
+        item.uncomplete()
+        return {'success': True, 'task': item.content}
+
     def _tool_update_priority(self, task_id, priority):
         item = self.todoist.get_item_by_id(task_id)
         if item is None:
@@ -483,7 +620,15 @@ class TelegramBot:
         self.todoist.update_item(item, priority=priority)
         return {'success': True, 'task': item.content, 'priority': priority}
 
-    def _tool_add_task(self, content, project_name=None, due_string=None, priority=1, labels=None):
+    def _tool_add_task(
+        self,
+        content,
+        project_name=None,
+        section_name=None,
+        due_string=None,
+        priority=1,
+        labels=None,
+    ):
         from tools_for_todoist.models.item import TodoistItem
 
         project_id = None
@@ -494,7 +639,14 @@ class TelegramBot:
         if project_id is None:
             project_id = self.todoist._initial_result['user']['inbox_project_id']
 
+        section_id = None
+        if section_name and project_id:
+            section = self.todoist.get_section_by_name(project_id, section_name)
+            if section:
+                section_id = section['id']
+
         item = TodoistItem(self.todoist, content, project_id)
+        item.section_id = section_id
         if due_string:
             item._due = {'string': due_string}
         item.priority = priority
@@ -551,6 +703,19 @@ class TelegramBot:
             for c in self.todoist._collaborators.values()
         ]
         return {'collaborators': collaborators}
+
+    def _tool_list_sections(self, project_name):
+        project = self.todoist.get_project_by_name(project_name)
+        if project is None:
+            return {'error': f'Project "{project_name}" not found'}
+        sections = self.todoist.get_sections_for_project(project['id'])
+        return {
+            'sections': [
+                {'id': s['id'], 'name': s['name'], 'order': s.get('section_order', 0)}
+                for s in sections
+            ],
+            'count': len(sections),
+        }
 
     def _save_memory_to_storage(self):
         get_storage().set_value(BOT_MEMORY_KEY, self._memory)
@@ -648,6 +813,47 @@ class TelegramBot:
             logger.exception(f'Telegram bot AI processing failed: {e}', exc_info=e)
             return f'Error processing your request: {e}'
 
+    def _should_send_proactive_update(self):
+        tz = gettz(self._user_timezone)
+        now = datetime.now(tz)
+        if now.minute < 55:
+            return False
+        if now.hour not in PROACTIVE_UPDATE_HOURS:
+            return False
+        check_key = (now.date(), now.hour)
+        if self._last_proactive_hour == check_key:
+            return False
+        return True
+
+    def _send_proactive_update(self, context='hourly'):
+        tz = gettz(self._user_timezone)
+        now = datetime.now(tz)
+        self._last_proactive_hour = (now.date(), now.hour)
+
+        prompt = (
+            f'(Automated {context} update) '
+            f"It's currently {now.strftime('%H:%M on %A, %B %d, %Y')}. "
+            'Please give me a proactive status update. Review my tasks and tell me:\n'
+            '1. Any overdue tasks that need immediate attention\n'
+            '2. Upcoming meetings or important tasks in the next few hours\n'
+            '3. Tasks I might be procrastinating on (check your memory for patterns)\n'
+            '4. Any helpful reminders\n\n'
+            'Be concise but firm about important things. Increase urgency for tasks '
+            "you know I've been putting off.\n"
+            'If this is a follow-up update, don\'t repeat information from the last '
+            'update unless the situation has changed or it\'s urgent enough to re-emphasize. '
+            'Focus on what\'s new or different since last time.'
+        )
+
+        logger.info(f'Sending proactive {context} update')
+        response = self._process_message(prompt)
+        self._send_message(response)
+
+    def send_startup_update(self):
+        if not self.is_configured:
+            return
+        self._send_proactive_update(context='startup')
+
     def poll(self):
         if not self.is_configured:
             return False
@@ -667,5 +873,8 @@ class TelegramBot:
             had_messages = True
             response = self._process_message(text)
             self._send_message(response)
+
+        if self._should_send_proactive_update():
+            self._send_proactive_update()
 
         return had_messages

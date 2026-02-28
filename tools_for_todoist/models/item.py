@@ -37,6 +37,7 @@ class TodoistItem:
 
         self.id = None
         self.priority = 1
+        self.section_id = None
         self._due = None
         self._raw = None
         self._duration = None
@@ -62,6 +63,7 @@ class TodoistItem:
         self._due = self._raw['due']
         self._in_history = self._raw['checked']
         self.project_id = self._raw['project_id']
+        self.section_id = self._raw.get('section_id')
         self._labels = set(self._raw['labels'])
         self._duration = self._raw['duration']
 

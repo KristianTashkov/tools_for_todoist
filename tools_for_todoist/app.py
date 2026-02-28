@@ -58,13 +58,16 @@ def setup_logger(logging_level=logging.DEBUG):
     return logger
 
 
-def run_sync_service(logger):
+def run_sync_service(logger, is_exception_restart=False):
     todoist = Todoist()
     google_calendar = GoogleCalendar()
     calendar_service = CalendarToTodoistService(todoist, google_calendar)
     night_owl_enabler = NightOwlEnabler(todoist, google_calendar)
     telegram_bot = TelegramBot(todoist)
     logger.info('Started syncing service.')
+
+    if not is_exception_restart:
+        telegram_bot.send_startup_update()
 
     while True:
         telegram_bot.poll()
@@ -99,11 +102,13 @@ def main():
     storage = setup_storage()
     logger = setup_logger(os.environ.get('LOGGING_LEVEL', logging.DEBUG))
     restart_delay = 0
+    is_exception_restart = False
     while True:
         start_time = time.monotonic()
         try:
-            run_sync_service(logger)
+            run_sync_service(logger, is_exception_restart=is_exception_restart)
         except Exception as e:
+            is_exception_restart = True
             elapsed = time.monotonic() - start_time
             if elapsed >= STABLE_RUNNING_THRESHOLD:
                 restart_delay = 0

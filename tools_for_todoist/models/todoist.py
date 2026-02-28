@@ -47,6 +47,7 @@ class Todoist:
         self._command_queue = []
         self._items = {}
         self._projects = {}
+        self._sections = {}
         self._collaborators = {}
         self._last_completed = None
         self._initial_sync()
@@ -107,6 +108,11 @@ class Todoist:
     def _update_projects(self, sync_result):
         for project in sync_result.get('projects', []):
             self._projects[project['id']] = project
+        for section in sync_result.get('sections', []):
+            if section.get('is_deleted'):
+                self._sections.pop(section['id'], None)
+            else:
+                self._sections[section['id']] = section
         for collaborator in sync_result.get('collaborators', []):
             self._collaborators[collaborator['id']] = collaborator
 
@@ -212,6 +218,16 @@ class Todoist:
                 return project
         return None
 
+    def get_section_by_name(self, project_id, name):
+        name_lower = name.lower()
+        for section in self._sections.values():
+            if section['project_id'] == project_id and section['name'].lower() == name_lower:
+                return section
+        return None
+
+    def get_sections_for_project(self, project_id):
+        return [s for s in self._sections.values() if s['project_id'] == project_id]
+
     def create_label(self, name):
         logger.info(f'Creating label| {name}')
         temp_id = str(uuid.uuid4())
@@ -229,6 +245,8 @@ class Todoist:
             'labels': list(item.labels()),
             'description': item.description,
         }
+        if item.section_id is not None:
+            args['section_id'] = item.section_id
         if item._due is not None:
             args['due'] = item._due
         if item._duration is not None:
