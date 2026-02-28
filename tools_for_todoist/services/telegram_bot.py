@@ -117,7 +117,7 @@ TOOLS = [
                                 },
                                 'priority': {
                                     'type': 'integer',
-                                    'description': 'For update_priority: 1 (urgent) to 4 (normal)',
+                                    'description': 'For update_priority: 1 (normal) to 4 (urgent)',
                                     'enum': [1, 2, 3, 4],
                                 },
                                 'label': {
@@ -186,7 +186,7 @@ TOOLS = [
                                 },
                                 'priority': {
                                     'type': 'integer',
-                                    'description': 'Priority: 1 (urgent) to 4 (normal)',
+                                    'description': 'Priority: 1 (normal) to 4 (urgent)',
                                     'enum': [1, 2, 3, 4],
                                 },
                                 'labels': {
