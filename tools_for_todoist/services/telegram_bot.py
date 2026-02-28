@@ -361,7 +361,9 @@ You have persistent long-term memory. Use save_memory to remember user preferenc
 instructions, or anything important for future conversations. Use delete_memory to remove \
 outdated entries. Use compact_history to replace recent conversation history with a short \
 summary when the user changes topic — this keeps context manageable. Your current memories:
-{memories}"""
+{memories}
+
+**Available projects:** {projects}"""
 
 PROACTIVE_UPDATE_HOURS = {7, 11, 15, 19, 23}
 
@@ -768,6 +770,14 @@ class TelegramBot:
             return '(none)'
         return '\n'.join(f'- {key}: {value}' for key, value in self._memory.items())
 
+    def _format_projects(self):
+        names = sorted(
+            p['name']
+            for p in self.todoist._projects.values()
+            if not p.get('is_deleted') and not p.get('is_archived')
+        )
+        return ', '.join(names) if names else '(none)'
+
     def _tool_compact_history(self, summary):
         entry_count = len(self._conversation_history)
         self._conversation_history = [
@@ -834,6 +844,7 @@ class TelegramBot:
                     current_time=now.strftime('%H:%M on %A, %B %d, %Y'),
                     user_timezone=self._user_timezone,
                     memories=self._format_memories(),
+                    projects=self._format_projects(),
                 ),
             },
         ]
