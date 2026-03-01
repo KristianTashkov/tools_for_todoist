@@ -20,12 +20,11 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import requests
 from dateutil.tz import gettz
 from openai import OpenAI
-from openai.types import ReasoningEffort
 
 from tools_for_todoist.storage import get_storage
 
@@ -61,267 +60,225 @@ OPENAI_MODEL = 'telegram_bot.openai_model'
 TOOLS = [
     {
         'type': 'function',
-        'function': {
-            'name': 'list_tasks',
-            'description': (
-                'List active Todoist tasks. Can filter by project name, label, or whether '
-                'they have a due date. Returns task id, content, due date, labels, and priority.'
-            ),
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'project_name': {
-                        'type': 'string',
-                        'description': 'Filter by project name (exact match)',
-                    },
-                    'label': {
-                        'type': 'string',
-                        'description': 'Filter by label name',
-                    },
-                    'with_due_date_only': {
-                        'type': 'boolean',
-                        'description': 'If true, only return tasks that have a due date',
-                    },
-                    'include_completed': {
-                        'type': 'boolean',
-                        'description': (
-                            'If true, include completed tasks. Useful for shopping lists '
-                            'to find items that can be uncompleted instead of re-created.'
-                        ),
-                    },
+        'name': 'list_tasks',
+        'description': (
+            'List active Todoist tasks. Can filter by project name, label, or whether '
+            'they have a due date. Returns task id, content, due date, labels, and priority.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'project_name': {
+                    'type': 'string',
+                    'description': 'Filter by project name (exact match)',
+                },
+                'label': {
+                    'type': 'string',
+                    'description': 'Filter by label name',
+                },
+                'with_due_date_only': {
+                    'type': 'boolean',
+                    'description': 'If true, only return tasks that have a due date',
+                },
+                'include_completed': {
+                    'type': 'boolean',
+                    'description': (
+                        'If true, include completed tasks. Useful for shopping lists '
+                        'to find items that can be uncompleted instead of re-created.'
+                    ),
                 },
             },
         },
     },
     {
         'type': 'function',
-        'function': {
-            'name': 'update_tasks',
-            'description': (
-                'Perform one or more actions on existing tasks in a single batch call. '
-                'Each action specifies what to do and which task. Supported actions: '
-                'complete, uncomplete, reschedule, update_priority, add_label, '
-                'remove_label, assign, move_to_project.'
-            ),
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'actions': {
-                        'type': 'array',
-                        'description': 'List of actions to perform',
-                        'items': {
-                            'type': 'object',
-                            'properties': {
-                                'action': {
-                                    'type': 'string',
-                                    'enum': [
-                                        'complete',
-                                        'uncomplete',
-                                        'reschedule',
-                                        'update_priority',
-                                        'add_label',
-                                        'remove_label',
-                                        'assign',
-                                        'move_to_project',
-                                    ],
-                                    'description': 'The action to perform',
-                                },
-                                'task_id': {
-                                    'type': 'string',
-                                    'description': 'The ID of the task',
-                                },
-                                'due_date': {
-                                    'type': 'string',
-                                    'description': (
-                                        'For reschedule: new due date in ISO format '
-                                        '(YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS in user tz)'
-                                    ),
-                                },
-                                'priority': {
-                                    'type': 'integer',
-                                    'description': 'For update_priority: 1 (normal) to 4 (urgent)',
-                                    'enum': [1, 2, 3, 4],
-                                },
-                                'label': {
-                                    'type': 'string',
-                                    'description': 'For add_label/remove_label: label name',
-                                },
-                                'person_name': {
-                                    'type': 'string',
-                                    'description': (
-                                        'For assign: name of person (partial match), '
-                                        'or "unassign" to remove assignment'
-                                    ),
-                                },
-                                'project_name': {
-                                    'type': 'string',
-                                    'description': (
-                                        'For move_to_project: name of the target project'
-                                    ),
-                                },
+        'name': 'update_tasks',
+        'description': (
+            'Perform one or more actions on existing tasks in a single batch call. '
+            'Each action specifies what to do and which task. Supported actions: '
+            'complete, uncomplete, reschedule, update_priority, add_label, '
+            'remove_label, assign, move_to_project.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'actions': {
+                    'type': 'array',
+                    'description': 'List of actions to perform',
+                    'items': {
+                        'type': 'object',
+                        'properties': {
+                            'action': {
+                                'type': 'string',
+                                'enum': [
+                                    'complete',
+                                    'uncomplete',
+                                    'reschedule',
+                                    'update_priority',
+                                    'add_label',
+                                    'remove_label',
+                                    'assign',
+                                    'move_to_project',
+                                ],
+                                'description': 'The action to perform',
                             },
-                            'required': ['action', 'task_id'],
-                        },
-                    },
-                },
-                'required': ['actions'],
-            },
-        },
-    },
-    {
-        'type': 'function',
-        'function': {
-            'name': 'add_tasks',
-            'description': 'Create one or more new tasks in Todoist in a single batch call.',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'tasks': {
-                        'type': 'array',
-                        'description': 'List of tasks to create',
-                        'items': {
-                            'type': 'object',
-                            'properties': {
-                                'content': {
-                                    'type': 'string',
-                                    'description': 'The text/title of the task',
-                                },
-                                'project_name': {
-                                    'type': 'string',
-                                    'description': ('Project to add to. Defaults to Personal.'),
-                                },
-                                'section_name': {
-                                    'type': 'string',
-                                    'description': 'Section within the project',
-                                },
-                                'parent_id': {
-                                    'type': 'string',
-                                    'description': (
-                                        'ID of a parent task to create this as a subtask of'
-                                    ),
-                                },
-                                'due_string': {
-                                    'type': 'string',
-                                    'description': (
-                                        'Natural language due date (e.g. "tomorrow at 10:00")'
-                                    ),
-                                },
-                                'priority': {
-                                    'type': 'integer',
-                                    'description': 'Priority: 1 (normal) to 4 (urgent)',
-                                    'enum': [1, 2, 3, 4],
-                                },
-                                'labels': {
-                                    'type': 'array',
-                                    'items': {'type': 'string'},
-                                    'description': 'List of label names to assign',
-                                },
+                            'task_id': {
+                                'type': 'string',
+                                'description': 'The ID of the task',
                             },
-                            'required': ['content'],
+                            'due_date': {
+                                'type': 'string',
+                                'description': (
+                                    'For reschedule: new due date in ISO format '
+                                    '(YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS in user tz)'
+                                ),
+                            },
+                            'priority': {
+                                'type': 'integer',
+                                'description': 'For update_priority: 1 (normal) to 4 (urgent)',
+                                'enum': [1, 2, 3, 4],
+                            },
+                            'label': {
+                                'type': 'string',
+                                'description': 'For add_label/remove_label: label name',
+                            },
+                            'person_name': {
+                                'type': 'string',
+                                'description': (
+                                    'For assign: name of person (partial match), '
+                                    'or "unassign" to remove assignment'
+                                ),
+                            },
+                            'project_name': {
+                                'type': 'string',
+                                'description': ('For move_to_project: name of the target project'),
+                            },
                         },
+                        'required': ['action', 'task_id'],
                     },
                 },
-                'required': ['tasks'],
             },
+            'required': ['actions'],
         },
     },
     {
         'type': 'function',
-        'function': {
-            'name': 'save_memory',
-            'description': (
-                'Save a note to persistent long-term memory. Use this to remember user '
-                'preferences, recurring instructions, important context, or anything the user '
-                'asks you to remember. Each memory has a unique key (overwriting if it exists).'
-            ),
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'key': {
-                        'type': 'string',
-                        'description': (
-                            'A short descriptive key for this memory '
-                            '(e.g. "preferred_meeting_time", "project_priorities")'
-                        ),
-                    },
-                    'value': {
-                        'type': 'string',
-                        'description': 'The content to remember',
+        'name': 'add_tasks',
+        'description': 'Create one or more new tasks in Todoist in a single batch call.',
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'tasks': {
+                    'type': 'array',
+                    'description': 'List of tasks to create',
+                    'items': {
+                        'type': 'object',
+                        'properties': {
+                            'content': {
+                                'type': 'string',
+                                'description': 'The text/title of the task',
+                            },
+                            'project_name': {
+                                'type': 'string',
+                                'description': ('Project to add to. Defaults to Personal.'),
+                            },
+                            'section_name': {
+                                'type': 'string',
+                                'description': 'Section within the project',
+                            },
+                            'parent_id': {
+                                'type': 'string',
+                                'description': (
+                                    'ID of a parent task to create this as a subtask of'
+                                ),
+                            },
+                            'due_string': {
+                                'type': 'string',
+                                'description': (
+                                    'Natural language due date (e.g. "tomorrow at 10:00")'
+                                ),
+                            },
+                            'priority': {
+                                'type': 'integer',
+                                'description': 'Priority: 1 (normal) to 4 (urgent)',
+                                'enum': [1, 2, 3, 4],
+                            },
+                            'labels': {
+                                'type': 'array',
+                                'items': {'type': 'string'},
+                                'description': 'List of label names to assign',
+                            },
+                        },
+                        'required': ['content'],
                     },
                 },
-                'required': ['key', 'value'],
             },
+            'required': ['tasks'],
         },
     },
     {
         'type': 'function',
-        'function': {
-            'name': 'delete_memory',
-            'description': 'Delete a specific entry from persistent long-term memory.',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'key': {
-                        'type': 'string',
-                        'description': 'The key of the memory to delete',
-                    },
+        'name': 'save_memory',
+        'description': (
+            'Save a note to persistent long-term memory. Use this to remember user '
+            'preferences, recurring instructions, important context, or anything the user '
+            'asks you to remember. Each memory has a unique key (overwriting if it exists).'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'key': {
+                    'type': 'string',
+                    'description': (
+                        'A short descriptive key for this memory '
+                        '(e.g. "preferred_meeting_time", "project_priorities")'
+                    ),
                 },
-                'required': ['key'],
+                'value': {
+                    'type': 'string',
+                    'description': 'The content to remember',
+                },
             },
+            'required': ['key', 'value'],
         },
     },
     {
         'type': 'function',
-        'function': {
-            'name': 'list_collaborators',
-            'description': 'List all collaborators (people) available for task assignment.',
-            'parameters': {'type': 'object', 'properties': {}},
+        'name': 'delete_memory',
+        'description': 'Delete a specific entry from persistent long-term memory.',
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'key': {
+                    'type': 'string',
+                    'description': 'The key of the memory to delete',
+                },
+            },
+            'required': ['key'],
         },
     },
     {
         'type': 'function',
-        'function': {
-            'name': 'list_sections',
-            'description': (
-                'List sections in a project. Useful for grocery/shopping lists where '
-                'items are organized by store section (e.g. Produce, Dairy, Frozen).'
-            ),
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'project_name': {
-                        'type': 'string',
-                        'description': 'Name of the project to list sections for',
-                    },
-                },
-                'required': ['project_name'],
-            },
-        },
+        'name': 'list_collaborators',
+        'description': 'List all collaborators (people) available for task assignment.',
+        'parameters': {'type': 'object', 'properties': {}},
     },
     {
         'type': 'function',
-        'function': {
-            'name': 'compact_history',
-            'description': (
-                'Replace the recent conversation history with a short summary. '
-                'Call this when the user is moving on to a different topic and the full '
-                'detail of previous exchanges is no longer needed. Write a concise summary '
-                'that preserves any important context, decisions, or outcomes.'
-            ),
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'summary': {
-                        'type': 'string',
-                        'description': (
-                            'A concise summary of the conversation so far, preserving '
-                            'key decisions, actions taken, and any context that may be '
-                            'relevant later'
-                        ),
-                    },
+        'name': 'list_sections',
+        'description': (
+            'List sections in a project. Useful for grocery/shopping lists where '
+            'items are organized by store section (e.g. Produce, Dairy, Frozen).'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'project_name': {
+                    'type': 'string',
+                    'description': 'Name of the project to list sections for',
                 },
-                'required': ['summary'],
             },
+            'required': ['project_name'],
         },
     },
 ]
@@ -370,8 +327,7 @@ that use sections, always check list_sections first and assign the appropriate s
 
 You have persistent long-term memory. Use save_memory to remember user preferences, \
 instructions, or anything important for future conversations. Use delete_memory to remove \
-outdated entries. Use compact_history to replace recent conversation history with a short \
-summary when the user changes topic — this keeps context manageable. Your current memories:
+outdated entries. Your current memories:
 {memories}
 
 **Available projects:** {projects}"""
@@ -389,8 +345,8 @@ class TelegramBot:
         self._openai_model = storage.get_value(OPENAI_MODEL)
         self._bot_state = _load_bot_state()
         self._update_offset = self._bot_state.get('update_offset')
+        self._last_response_id = self._bot_state.get('last_response_id')
         self._openai_client = None
-        self._conversation_history = self._load_history()
         self._memory = self._bot_state.get('memory', {})
         self._last_proactive_hour = None
         self._last_completed_cache = None
@@ -409,38 +365,13 @@ class TelegramBot:
     def is_configured(self):
         return self._openai_client is not None
 
-    def _load_history(self):
-        raw = self._bot_state.get('conversation_history', [])
-        history = []
-        for entry in raw:
-            try:
-                ts = datetime.fromisoformat(entry['timestamp'])
-            except (KeyError, ValueError):
-                ts = datetime.now(timezone.utc)
-            if 'messages' in entry:
-                history.append({'messages': entry['messages'], 'timestamp': ts})
-            elif 'user' in entry and 'assistant' in entry:
-                history.append(
-                    {
-                        'messages': [
-                            {'role': 'user', 'content': entry['user']},
-                            {'role': 'assistant', 'content': entry['assistant']},
-                        ],
-                        'timestamp': ts,
-                    }
-                )
-        return history
-
-    def _save_history(self):
-        serializable = [
-            {
-                'messages': e['messages'],
-                'timestamp': e['timestamp'].isoformat(),
-            }
-            for e in self._conversation_history
-        ]
-        self._bot_state['conversation_history'] = serializable
+    def _save_response_id(self):
+        self._bot_state['last_response_id'] = self._last_response_id
         _save_bot_state(self._bot_state)
+
+    def _clear_conversation(self):
+        self._last_response_id = None
+        self._save_response_id()
 
     def _telegram_api(self, method, **kwargs):
         url = f'https://api.telegram.org/bot{self._bot_token}/{method}'
@@ -548,8 +479,6 @@ class TelegramBot:
             return self._tool_list_collaborators()
         elif name == 'list_sections':
             return self._tool_list_sections(**args)
-        elif name == 'compact_history':
-            return self._tool_compact_history(**args)
         return {'error': f'Unknown tool: {name}'}
 
     def _tool_list_tasks(
@@ -801,30 +730,6 @@ class TelegramBot:
         )
         return ', '.join(names) if names else '(none)'
 
-    def _tool_compact_history(self, summary):
-        entry_count = len(self._conversation_history)
-        self._conversation_history = [
-            {
-                'messages': [
-                    {'role': 'user', 'content': '(previous conversation summary)'},
-                    {'role': 'assistant', 'content': summary},
-                ],
-                'timestamp': datetime.now(timezone.utc),
-            }
-        ]
-        self._save_history()
-        logger.info(f'Telegram bot compacted {entry_count} history entries into summary')
-        return {'success': True, 'compacted_entries': entry_count}
-
-    def _prune_history(self):
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=8)
-        before = len(self._conversation_history)
-        self._conversation_history = [
-            entry for entry in self._conversation_history if entry['timestamp'] >= cutoff
-        ]
-        if len(self._conversation_history) != before:
-            self._save_history()
-
     def _handle_service_command(self, text):
         command = text.strip().lower()
         if not command.startswith('/'):
@@ -832,11 +737,11 @@ class TelegramBot:
         if command == '/shutdown':
             self._send_message('Shutting down. Bye! 👋')
             os._exit(0)
+        if command == '/summary':
+            self._send_proactive_update()
         if command == '/clear':
-            count = len(self._conversation_history)
-            self._conversation_history = []
-            self._save_history()
-            return f'🗑 Cleared {count} conversation history entries.'
+            self._clear_conversation()
+            return '🗑 Cleared conversation history.'
         elif command == '/memory':
             if not self._memory:
                 return '🧠 Long-term memory is empty.'
@@ -844,122 +749,68 @@ class TelegramBot:
             for key, value in self._memory.items():
                 lines.append(f'• {key}: {value}')
             return '\n'.join(lines)
-        elif command == '/history':
-            if not self._conversation_history:
-                return '💬 Conversation history is empty.'
-            lines = [f'💬 **Conversation history** ({len(self._conversation_history)} entries):']
-            for entry in self._conversation_history:
-                ts = entry['timestamp'].strftime('%H:%M')
-                msgs = entry['messages']
-                user_msg = next((m['content'][:200] for m in msgs if m['role'] == 'user'), '?')
-                assistant_msg = next(
-                    (
-                        m['content'][:200]
-                        for m in reversed(msgs)
-                        if m['role'] == 'assistant' and m.get('content')
-                    ),
-                    '?',
-                )
-                tool_count = sum(1 for m in msgs if m['role'] == 'tool')
-                tool_info = f' [{tool_count} tool calls]' if tool_count else ''
-                lines.append(f'[{ts}] User: {user_msg}')
-                lines.append(f'[{ts}] Bot: {assistant_msg}{tool_info}')
-            return '\n'.join(lines)
         elif command == '/tasks':
             return str(self._tool_list_tasks())
         else:
             return '❓ Unknown command'
 
-    def _process_message(self, text, reasoning_effort: ReasoningEffort):
-        self._prune_history()
+    def _build_instructions(self):
+        return SYSTEM_PROMPT.format(
+            user_timezone=self._user_timezone,
+            memories=self._format_memories(),
+            projects=self._format_projects(),
+        )
+
+    def _process_message(self, text: str, reasoning_level: str):
+        instructions = self._build_instructions()
 
         tz = gettz(self._user_timezone)
         now = datetime.now(tz)
         current_time = now.strftime('%H:%M on %A, %B %d, %Y')
-        messages = [
-            {
-                'role': 'system',
-                'content': SYSTEM_PROMPT.format(
-                    user_timezone=self._user_timezone,
-                    memories=self._format_memories(),
-                    projects=self._format_projects(),
-                ),
-            },
-        ]
-        for entry in self._conversation_history:
-            messages.extend(entry['messages'])
-        text = f'The current time is: {current_time}\n{text}'
-        messages.append({'role': 'user', 'content': text})
-
-        turn_messages = [{'role': 'user', 'content': text}]
-
+        text += f'\nThe current time is: {current_time}'
+        input_messages = [{'role': 'user', 'content': text}]
         try:
             for _iteration in range(100):
-                response = self._openai_client.chat.completions.create(
-                    model=self._openai_model,
-                    reasoning_effort=reasoning_effort,
-                    messages=messages,
-                    tools=TOOLS,
-                    prompt_cache_key='tft_telegram_bot',
-                )
-                logger.debug(f'Response token usage: {str(response.usage)}')
-                choice = response.choices[0]
+                kwargs = {
+                    'model': self._openai_model,
+                    'instructions': instructions,
+                    'input': input_messages,
+                    'tools': TOOLS,
+                    'prompt_cache_key': 'telegram_bot',
+                    'reasoning': {'effort': reasoning_level},
+                }
+                if self._last_response_id:
+                    kwargs['previous_response_id'] = self._last_response_id
 
-                if choice.message.tool_calls:
-                    assistant_msg = self._serialize_assistant_message(choice.message)
-                    messages.append(assistant_msg)
-                    turn_messages.append(assistant_msg)
-                    for tool_call in choice.message.tool_calls:
-                        args = json.loads(tool_call.function.arguments)
-                        bot_tool_call_message = (
-                            f'Telegram bot tool call: {tool_call.function.name}({args})'
+                response = self._openai_client.responses.create(**kwargs)
+                logger.debug(f'Response usage: {response.usage}')
+
+                function_calls = [item for item in response.output if item.type == 'function_call']
+                if function_calls:
+                    input_messages = list(response.output)
+                    for fc in function_calls:
+                        args = json.loads(fc.arguments)
+                        logger.info(f'Telegram bot tool call: {fc.name}({args})')
+                        self._send_message(f'Telegram bot tool call: {fc.name}({args})')
+                        result = self._execute_tool(fc.name, args)
+                        input_messages.append(
+                            {
+                                'type': 'function_call_output',
+                                'call_id': fc.call_id,
+                                'output': json.dumps(result),
+                            }
                         )
-                        logger.info(bot_tool_call_message)
-                        self._send_message(bot_tool_call_message)
-                        result = self._execute_tool(tool_call.function.name, args)
-                        tool_msg = {
-                            'role': 'tool',
-                            'tool_call_id': tool_call.id,
-                            'content': json.dumps(result),
-                        }
-                        messages.append(tool_msg)
-                        turn_messages.append(tool_msg)
                     continue
 
-                reply = choice.message.content or 'Done.'
-                turn_messages.append({'role': 'assistant', 'content': reply})
-                self._conversation_history.append(
-                    {
-                        'messages': turn_messages,
-                        'timestamp': datetime.now(timezone.utc),
-                    }
-                )
-                self._save_history()
+                reply = response.output_text or 'Done.'
+                self._last_response_id = response.id
+                self._save_response_id()
                 return reply
 
             return 'Sorry, I hit the maximum number of steps. Please try a simpler request.'
         except Exception as e:
             logger.exception(f'Telegram bot AI processing failed: {e}', exc_info=e)
             return f'Error processing your request: {e}'
-
-    @staticmethod
-    def _serialize_assistant_message(message):
-        msg = {'role': 'assistant'}
-        if message.content:
-            msg['content'] = message.content
-        if message.tool_calls:
-            msg['tool_calls'] = [
-                {
-                    'id': tc.id,
-                    'type': 'function',
-                    'function': {
-                        'name': tc.function.name,
-                        'arguments': tc.function.arguments,
-                    },
-                }
-                for tc in message.tool_calls
-            ]
-        return msg
 
     def _should_send_proactive_update(self):
         tz = gettz(self._user_timezone)
@@ -978,7 +829,7 @@ class TelegramBot:
         now = datetime.now(tz)
         self._last_proactive_hour = (now.date(), now.hour)
 
-        current_tasks = self._tool_list_tasks(with_due_date_only=True, include_completed=True)
+        current_tasks = self._tool_list_tasks(with_due_date_only=True)
         prompt = (
             f'(Automated {context} update) '
             'Please give me a status update. Review my tasks and tell me:\n'
@@ -993,12 +844,11 @@ class TelegramBot:
             "call those out in the update.\n"
             'If this is a follow-up update, don\'t repeat information from the last '
             'update unless the situation has changed or it\'s urgent enough to re-emphasize.\n'
-            f"It's currently {now.strftime('%H:%M on %A, %B %d, %Y')}. "
             f"Current Tasks state: {current_tasks}"
         )
 
         logger.info(f'Sending proactive {context} update')
-        response = self._process_message(prompt, reasoning_effort='medium')
+        response = self._process_message(prompt, reasoning_level='high')
         self._send_message(response)
 
     def poll(self):
@@ -1025,7 +875,7 @@ class TelegramBot:
             if service_response is not None:
                 self._send_message(service_response)
             else:
-                response = self._process_message(text, reasoning_effort='medium')
+                response = self._process_message(text, reasoning_level='medium')
                 self._send_message(response)
 
         if self._should_send_proactive_update():
