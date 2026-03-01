@@ -308,8 +308,6 @@ SYSTEM_PROMPT = """\
 You are a helpful Todoist assistant running on a personal server. \
 You help manage tasks: listing, rescheduling, completing, creating, and organizing them.
 
-The current time is {current_time}.
-
 When the user asks about tasks, use the list_tasks tool first to find relevant tasks, \
 then answer based on the results.
 
@@ -837,11 +835,11 @@ class TelegramBot:
 
         tz = gettz(self._user_timezone)
         now = datetime.now(tz)
+        current_time = now.strftime('%H:%M on %A, %B %d, %Y')
         messages = [
             {
                 'role': 'system',
                 'content': SYSTEM_PROMPT.format(
-                    current_time=now.strftime('%H:%M on %A, %B %d, %Y'),
                     user_timezone=self._user_timezone,
                     memories=self._format_memories(),
                     projects=self._format_projects(),
@@ -851,6 +849,7 @@ class TelegramBot:
         for entry in self._conversation_history:
             messages.append({'role': 'user', 'content': entry['user']})
             messages.append({'role': 'assistant', 'content': entry['assistant']})
+        text = f'The current time is: {current_time}\n{text}'
         messages.append({'role': 'user', 'content': text})
 
         try:
@@ -859,6 +858,7 @@ class TelegramBot:
                     model=self._openai_model,
                     messages=messages,
                     tools=TOOLS,
+                    prompt_cache_key='tft_telegram_bot',
                 )
                 choice = response.choices[0]
 
@@ -914,7 +914,6 @@ class TelegramBot:
 
         prompt = (
             f'(Automated {context} update) '
-            f"It's currently {now.strftime('%H:%M on %A, %B %d, %Y')}. "
             'Please give me a proactive status update. Review my tasks and tell me:\n'
             '1. Any overdue tasks that need immediate attention\n'
             '2. Upcoming meetings or important tasks in the next few hours\n'
@@ -925,6 +924,7 @@ class TelegramBot:
             'If this is a follow-up update, don\'t repeat information from the last '
             'update unless the situation has changed or it\'s urgent enough to re-emphasize. '
             'Focus on what\'s new or different since last time.'
+            f"It's currently {now.strftime('%H:%M on %A, %B %d, %Y')}. "
         )
 
         logger.info(f'Sending proactive {context} update')
