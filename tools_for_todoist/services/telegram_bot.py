@@ -383,7 +383,9 @@ class TelegramBot:
         # Telegram message limit is 4096 chars
         while text:
             chunk, text = text[:4096], text[4096:]
-            self._telegram_api('sendMessage', chat_id=self._chat_id, text=chunk)
+            self._telegram_api(
+                'sendMessage', chat_id=self._chat_id, text=chunk, parse_mode='Markdown'
+            )
 
     def _get_updates(self):
         params = {'timeout': 0, 'limit': 10}
@@ -438,6 +440,9 @@ class TelegramBot:
         parent_id = raw.get('parent_id')
         if parent_id:
             result['parent_id'] = parent_id
+        deadline = raw.get('deadline')
+        if deadline:
+            result['deadline'] = deadline
         due_date = item.next_due_date()
         if due_date is not None:
             result['due_date'] = str(due_date)
@@ -737,9 +742,10 @@ class TelegramBot:
         if command == '/shutdown':
             self._send_message('Shutting down. Bye! 👋')
             os._exit(0)
-        if command == '/summary':
+        elif command == '/summary':
             self._send_proactive_update()
-        if command == '/clear':
+            return '📊 Summary update sent.'
+        elif command == '/clear':
             self._clear_conversation()
             return '🗑 Cleared conversation history.'
         elif command == '/memory':
@@ -752,7 +758,7 @@ class TelegramBot:
         elif command == '/tasks':
             return str(self._tool_list_tasks())
         else:
-            return '❓ Unknown command'
+            return f'❓ Unknown command "{command}"'
 
     def _build_instructions(self):
         return SYSTEM_PROMPT.format(
