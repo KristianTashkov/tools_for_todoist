@@ -20,11 +20,12 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 
 import requests
 from dateutil.tz import gettz
 from openai import OpenAI
+from requests import HTTPError
 
 from tools_for_todoist.storage import get_storage
 
@@ -388,14 +389,17 @@ class TelegramBot:
         response.raise_for_status()
         return response.json()
 
-    def _send_message(self, text, parse_mode: str | None = None):
+    def _send_message(self, text):
         # Telegram message limit is 4096 chars
-        while text:
-            chunk, text = text[:4096], text[4096:]
-            params = dict(chat_id=self._chat_id, text=chunk)
-            if parse_mode is not None:
-                params['parse_mode'] = parse_mode
-            self._telegram_api('sendMessage', params)
+        original_text = str(text)
+        try:
+            while text:
+                chunk, text = text[:4000], text[4000:]
+                params = dict(chat_id=self._chat_id, text=chunk)
+                self._telegram_api('sendMessage', params)
+        except HTTPError as e:
+            logger.error(f'Failed to send Telegram message: "{original_text}", {e}')
+            raise
 
     def _get_updates(self):
         params = {'timeout': 0, 'limit': 10}
@@ -838,7 +842,7 @@ class TelegramBot:
 
         logger.info(f'Sending proactive {context} update')
         response = self._process_message(prompt, reasoning_level='high')
-        self._send_message(response, parse_mode='Markdown')
+        self._send_message(response)
 
     def poll(self):
         if not self.is_configured:
@@ -865,7 +869,7 @@ class TelegramBot:
                 self._send_message(service_response)
             else:
                 response = self._process_message(text, reasoning_level='medium')
-                self._send_message(response, parse_mode='Markdown')
+                self._send_message(response)
 
         if self._should_send_proactive_update():
             self._send_proactive_update()
