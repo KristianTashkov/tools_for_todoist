@@ -862,7 +862,7 @@ class TelegramBot:
                     tools=TOOLS,
                     prompt_cache_key='tft_telegram_bot',
                 )
-                response.usage
+                logger.debug(f'Response token usage: {str(response.usage)}')
                 choice = response.choices[0]
 
                 if choice.message.tool_calls:
