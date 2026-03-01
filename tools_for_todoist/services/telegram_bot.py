@@ -938,7 +938,7 @@ class TelegramBot:
         )
 
         logger.info(f'Sending proactive {context} update')
-        response = self._process_message(prompt, reasoning_effort='high')
+        response = self._process_message(prompt, reasoning_effort='medium')
         self._send_message(response)
 
     def poll(self):
