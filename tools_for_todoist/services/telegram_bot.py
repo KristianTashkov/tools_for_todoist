@@ -340,7 +340,8 @@ can batch multiple changes in a single call. Each action needs an "action" field
 "complete", "uncomplete", "reschedule", "update_priority", "add_label", "remove_label", \
 "assign") and a "task_id" field, plus action-specific fields.
 - To create new tasks: ALWAYS use the **add_tasks** tool. It accepts a "tasks" array so you \
-can create multiple tasks in one call.
+can create multiple tasks in one call. \
+Always prefix task names with a relevant emoji name for the task.
 - There are NO individual task-action tools. update_tasks and add_tasks are the ONLY ways \
 to make changes. Even for a single task, use these tools with a one-element array.
 - After making changes, confirm what you did.
