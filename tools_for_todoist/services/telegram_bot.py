@@ -337,16 +337,6 @@ The user's timezone is {user_timezone}. Task due dates in tool results may inclu
 user's timezone. If a task's timezone differs from the user's, convert it and show the \
 time in the user's timezone.
 
-**Proactive updates:** You periodically receive automated update requests. When you get one:
-- Use list_tasks with with_due_date_only=true to review tasks
-- Highlight meetings (calendar label) and urgent (priority 1) items prominently
-- For overdue tasks, be direct and firm
-- Recurring tasks include a 'last_completed_at' field showing when they were last completed. \
-Use this to detect procrastination: if a task's due date keeps being pushed forward but \
-last_completed_at is far in the past (or missing), the user is likely procrastinating. \
-Be gentle at first, firmer if the gap between last completion and current due date is large
-- Keep updates brief and actionable
-
 **Shopping lists:** When asked to add items to a shopping/grocery project:
 1. First use list_tasks with include_completed=true for that project to check for existing \
 completed items with the same name
@@ -793,7 +783,7 @@ class TelegramBot:
         return {'success': True, 'compacted_entries': entry_count}
 
     def _prune_history(self):
-        cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=8)
         before = len(self._conversation_history)
         self._conversation_history = [
             entry for entry in self._conversation_history if entry['timestamp'] >= cutoff
@@ -922,19 +912,23 @@ class TelegramBot:
         now = datetime.now(tz)
         self._last_proactive_hour = (now.date(), now.hour)
 
+        current_tasks = self._tool_list_tasks(with_due_date_only=True, include_completed=True)
         prompt = (
             f'(Automated {context} update) '
-            'Please give me a proactive status update. Review my tasks and tell me:\n'
+            'Please give me a status update. Review my tasks and tell me:\n'
             '1. Any overdue tasks that need immediate attention\n'
             '2. Upcoming meetings or important tasks in the next few hours\n'
-            '3. Tasks I might be procrastinating on (check your memory for patterns)\n'
+            '3. Tasks I might be procrastinating\n'
             '4. Any helpful reminders\n\n'
             'Be concise but firm about important things. Increase urgency for tasks '
             "you know I've been putting off.\n"
+            "Recurring tasks include a 'last_completed_at' field showing when they were last "
+            "completed. Use it to detect procrastination patterns and "
+            "call those out in the update.\n"
             'If this is a follow-up update, don\'t repeat information from the last '
-            'update unless the situation has changed or it\'s urgent enough to re-emphasize. '
-            'Focus on what\'s new or different since last time.'
+            'update unless the situation has changed or it\'s urgent enough to re-emphasize.\n'
             f"It's currently {now.strftime('%H:%M on %A, %B %d, %Y')}. "
+            f"Current Tasks state: {current_tasks}"
         )
 
         logger.info(f'Sending proactive {context} update')
