@@ -360,8 +360,6 @@ class TelegramBot:
         self._openai_client = None
         self._memory = self._bot_state.get('memory', {})
         self._last_proactive_hour = None
-        self._last_completed_cache = None
-        self._last_completed_cache_time = None
         self._user_timezone = (
             todoist._initial_result.get('user', {}).get('tz_info', {}).get('timezone', 'UTC')
         )
@@ -410,29 +408,6 @@ class TelegramBot:
             logger.warning(f'Telegram getUpdates failed: {e}')
             return []
 
-    def _get_last_completed_lookup(self):
-        now = datetime.now(timezone.utc)
-        if (
-            self._last_completed_cache is not None
-            and self._last_completed_cache_time
-            and (now - self._last_completed_cache_time).total_seconds() < 60
-        ):
-            return self._last_completed_cache
-        lookup = {}
-        for item in self.todoist._items.values():
-            if not item.is_completed():
-                continue
-            raw = item.raw() or {}
-            completed_at = raw.get('completed_at')
-            if not completed_at:
-                continue
-            key = (item.content.lower().strip(), item.project_id)
-            if key not in lookup or completed_at > lookup[key]:
-                lookup[key] = completed_at
-        self._last_completed_cache = lookup
-        self._last_completed_cache_time = now
-        return lookup
-
     def _task_to_dict(self, item):
         project = self.todoist._projects.get(item.project_id, {})
         result = {
@@ -469,12 +444,6 @@ class TelegramBot:
         completed_at = raw.get('completed_at')
         if completed_at:
             result['completed_at'] = completed_at
-        elif item.is_recurring() and not item.is_completed():
-            lookup = self._get_last_completed_lookup()
-            key = (item.content.lower().strip(), item.project_id)
-            last_completed = lookup.get(key)
-            if last_completed:
-                result['last_completed_at'] = last_completed
         responsible_uid = raw.get('responsible_uid')
         if responsible_uid:
             collaborator = self.todoist._collaborators.get(responsible_uid, {})
@@ -859,7 +828,7 @@ class TelegramBot:
             '4. Any helpful reminders\n\n'
             'Be concise but firm about important things. Increase urgency for tasks '
             "you know I've been putting off.\n"
-            "Recurring tasks include a 'last_completed_at' field showing when they were last "
+            "Recurring tasks include a 'completed_at' field showing when they were last "
             "completed. Use it to detect procrastination patterns and "
             "call those out in the update.\n"
             'If this is a follow-up update, don\'t repeat information from the last '
