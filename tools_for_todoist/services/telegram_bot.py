@@ -24,6 +24,7 @@ from datetime import datetime, timedelta, timezone
 import requests
 from dateutil.tz import gettz
 from openai import OpenAI
+from openai.types import ReasoningEffort
 
 from tools_for_todoist.storage import get_storage
 
@@ -830,7 +831,7 @@ class TelegramBot:
         else:
             return '❓ Unknown command'
 
-    def _process_message(self, text):
+    def _process_message(self, text, reasoning_effort: ReasoningEffort):
         self._prune_history()
 
         tz = gettz(self._user_timezone)
@@ -856,17 +857,21 @@ class TelegramBot:
             for _iteration in range(100):
                 response = self._openai_client.chat.completions.create(
                     model=self._openai_model,
+                    reasoning_effort=reasoning_effort,
                     messages=messages,
                     tools=TOOLS,
                     prompt_cache_key='tft_telegram_bot',
                 )
+                response.usage
                 choice = response.choices[0]
 
                 if choice.message.tool_calls:
                     messages.append(choice.message)
                     for tool_call in choice.message.tool_calls:
                         args = json.loads(tool_call.function.arguments)
-                        bot_tool_call_message = f'Telegram bot tool call: {tool_call.function.name}({args})'
+                        bot_tool_call_message = (
+                            f'Telegram bot tool call: {tool_call.function.name}({args})'
+                        )
                         logger.info(bot_tool_call_message)
                         self._send_message(bot_tool_call_message)
                         result = self._execute_tool(tool_call.function.name, args)
@@ -928,7 +933,7 @@ class TelegramBot:
         )
 
         logger.info(f'Sending proactive {context} update')
-        response = self._process_message(prompt)
+        response = self._process_message(prompt, reasoning_effort='high')
         self._send_message(response)
 
     def poll(self):
@@ -953,7 +958,7 @@ class TelegramBot:
             if service_response is not None:
                 self._send_message(service_response)
             else:
-                response = self._process_message(text)
+                response = self._process_message(text, reasoning_effort='medium')
                 self._send_message(response)
 
         if self._should_send_proactive_update():
