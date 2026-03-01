@@ -19,6 +19,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import json
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -36,6 +37,7 @@ OPENAI_API_KEY = 'telegram_bot.openai_api_key'
 OPENAI_MODEL = 'telegram_bot.openai_model'
 BOT_MEMORY_KEY = 'telegram_bot.memory'
 BOT_HISTORY_KEY = 'telegram_bot.conversation_history'
+BOT_UPDATE_OFFSET_KEY = 'telegram_bot.update_offset'
 
 TOOLS = [
     {
@@ -375,7 +377,7 @@ class TelegramBot:
         self._chat_id = storage.get_value(TELEGRAM_CHAT_ID_KEY)
         self._openai_api_key = storage.get_value(OPENAI_API_KEY)
         self._openai_model = storage.get_value(OPENAI_MODEL)
-        self._update_offset = None
+        self._update_offset = storage.get_value(BOT_UPDATE_OFFSET_KEY)
         self._openai_client = None
         self._conversation_history = self._load_history(storage)
         self._memory = storage.get_value(BOT_MEMORY_KEY, {})
@@ -803,6 +805,9 @@ class TelegramBot:
         command = text.strip().lower()
         if not command.startswith('/'):
             return None
+        if command == '/shutdown':
+            self._send_message('Shutting down. Bye! 👋')
+            os._exit(0)
         if command == '/clear':
             count = len(self._conversation_history)
             self._conversation_history = []
@@ -944,6 +949,7 @@ class TelegramBot:
         had_messages = False
         for update in updates:
             self._update_offset = update['update_id'] + 1
+            get_storage().set_value(BOT_UPDATE_OFFSET_KEY, self._update_offset)
             message = update.get('message', {})
             chat_id = str(message.get('chat', {}).get('id', ''))
             text = message.get('text', '')
