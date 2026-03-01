@@ -62,32 +62,43 @@ TOOLS = [
         'type': 'function',
         'name': 'list_tasks',
         'description': (
-            'List active Todoist tasks. Can filter by project name, label, or whether '
-            'they have a due date. Returns task id, content, due date, labels, and priority.'
+            'List active Todoist tasks. Call with NO parameters to get all tasks. '
+            'All parameters are optional filters — only include a parameter if you '
+            'specifically need to filter by it.'
         ),
         'parameters': {
             'type': 'object',
             'properties': {
                 'project_name': {
                     'type': 'string',
-                    'description': 'Filter by project name (exact match)',
+                    'description': (
+                        'Only include to filter by a specific project name (exact match). '
+                        'Omit to return tasks from all projects.'
+                    ),
                 },
                 'label': {
                     'type': 'string',
-                    'description': 'Filter by label name',
+                    'description': (
+                        'Only include to filter by a specific label. '
+                        'Omit to return tasks with any/no labels.'
+                    ),
                 },
                 'with_due_date_only': {
                     'type': 'boolean',
-                    'description': 'If true, only return tasks that have a due date',
+                    'description': (
+                        'Set to true to only return tasks that have a due date. '
+                        'Omit or false to include all tasks.'
+                    ),
                 },
                 'include_completed': {
                     'type': 'boolean',
                     'description': (
-                        'If true, include completed tasks. Useful for shopping lists '
-                        'to find items that can be uncompleted instead of re-created.'
+                        'Set to true to also include completed tasks. '
+                        'Omit or false to only return active tasks.'
                     ),
                 },
             },
+            'required': [],
         },
     },
     {
@@ -261,7 +272,7 @@ TOOLS = [
         'type': 'function',
         'name': 'list_collaborators',
         'description': 'List all collaborators (people) available for task assignment.',
-        'parameters': {'type': 'object', 'properties': {}},
+        'parameters': {'type': 'object', 'properties': {}, 'required': []},
     },
     {
         'type': 'function',
@@ -373,26 +384,27 @@ class TelegramBot:
         self._last_response_id = None
         self._save_response_id()
 
-    def _telegram_api(self, method, **kwargs):
+    def _telegram_api(self, method, params):
         url = f'https://api.telegram.org/bot{self._bot_token}/{method}'
-        response = requests.post(url, json=kwargs, timeout=5)
+        response = requests.post(url, json=params, timeout=5)
         response.raise_for_status()
         return response.json()
 
-    def _send_message(self, text):
+    def _send_message(self, text, parse_mode: str | None = None):
         # Telegram message limit is 4096 chars
         while text:
             chunk, text = text[:4096], text[4096:]
-            self._telegram_api(
-                'sendMessage', chat_id=self._chat_id, text=chunk, parse_mode='Markdown'
-            )
+            params = dict(chat_id=self._chat_id, text=chunk)
+            if parse_mode is not None:
+                params['parse_mode'] = parse_mode
+            self._telegram_api('sendMessage', params)
 
     def _get_updates(self):
         params = {'timeout': 0, 'limit': 10}
         if self._update_offset is not None:
             params['offset'] = self._update_offset
         try:
-            result = self._telegram_api('getUpdates', **params)
+            result = self._telegram_api('getUpdates', params)
             return result.get('result', [])
         except Exception as e:
             logger.warning(f'Telegram getUpdates failed: {e}')
@@ -489,15 +501,17 @@ class TelegramBot:
     def _tool_list_tasks(
         self, project_name=None, label=None, with_due_date_only=False, include_completed=False
     ):
+        project_name = project_name or None
+        label = label or None
         tasks = []
         for item in self.todoist._items.values():
             if item.is_completed() and not include_completed:
                 continue
-            if project_name is not None:
+            if project_name:
                 project = self.todoist._projects.get(item.project_id, {})
                 if project.get('name') != project_name:
                     continue
-            if label is not None and label not in item.labels():
+            if label and label not in item.labels():
                 continue
             if with_due_date_only and item.next_due_date() is None:
                 continue
@@ -855,7 +869,7 @@ class TelegramBot:
 
         logger.info(f'Sending proactive {context} update')
         response = self._process_message(prompt, reasoning_level='high')
-        self._send_message(response)
+        self._send_message(response, parse_mode='Markdown')
 
     def poll(self):
         if not self.is_configured:
@@ -882,7 +896,7 @@ class TelegramBot:
                 self._send_message(service_response)
             else:
                 response = self._process_message(text, reasoning_level='medium')
-                self._send_message(response)
+                self._send_message(response, parse_mode='Markdown')
 
         if self._should_send_proactive_update():
             self._send_proactive_update()
