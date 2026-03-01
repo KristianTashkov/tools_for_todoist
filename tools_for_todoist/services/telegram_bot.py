@@ -31,13 +31,32 @@ from tools_for_todoist.storage import get_storage
 
 logger = logging.getLogger(__name__)
 
+BOT_STATE_FILE = os.path.join(os.path.dirname(__file__), '..', 'storage', 'bot_state.json')
+
+
+def _load_bot_state():
+    try:
+        with open(BOT_STATE_FILE, 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
+        if not isinstance(e, FileNotFoundError):
+            logger.warning(f'Failed to load bot state, starting fresh: {e}')
+        return {}
+
+
+def _save_bot_state(state):
+    try:
+        os.makedirs(os.path.dirname(BOT_STATE_FILE), exist_ok=True)
+        with open(BOT_STATE_FILE, 'w') as f:
+            json.dump(state, f, indent=2)
+    except OSError as e:
+        logger.error(f'Failed to save bot state: {e}')
+
+
 TELEGRAM_BOT_TOKEN_KEY = 'logging.telegram_bot_token'
 TELEGRAM_CHAT_ID_KEY = 'logging.telegram_chat_id'
 OPENAI_API_KEY = 'telegram_bot.openai_api_key'
 OPENAI_MODEL = 'telegram_bot.openai_model'
-BOT_MEMORY_KEY = 'telegram_bot.memory'
-BOT_HISTORY_KEY = 'telegram_bot.conversation_history'
-BOT_UPDATE_OFFSET_KEY = 'telegram_bot.update_offset'
 
 TOOLS = [
     {
@@ -367,10 +386,11 @@ class TelegramBot:
         self._chat_id = storage.get_value(TELEGRAM_CHAT_ID_KEY)
         self._openai_api_key = storage.get_value(OPENAI_API_KEY)
         self._openai_model = storage.get_value(OPENAI_MODEL)
-        self._update_offset = storage.get_value(BOT_UPDATE_OFFSET_KEY)
+        self._bot_state = _load_bot_state()
+        self._update_offset = self._bot_state.get('update_offset')
         self._openai_client = None
-        self._conversation_history = self._load_history(storage)
-        self._memory = storage.get_value(BOT_MEMORY_KEY, {})
+        self._conversation_history = self._load_history()
+        self._memory = self._bot_state.get('memory', {})
         self._last_proactive_hour = None
         self._last_completed_cache = None
         self._last_completed_cache_time = None
@@ -388,28 +408,38 @@ class TelegramBot:
     def is_configured(self):
         return self._openai_client is not None
 
-    @staticmethod
-    def _load_history(storage):
-        raw = storage.get_value(BOT_HISTORY_KEY, [])
+    def _load_history(self):
+        raw = self._bot_state.get('conversation_history', [])
         history = []
         for entry in raw:
             try:
-                entry['timestamp'] = datetime.fromisoformat(entry['timestamp'])
+                ts = datetime.fromisoformat(entry['timestamp'])
             except (KeyError, ValueError):
-                entry['timestamp'] = datetime.now(timezone.utc)
-            history.append(entry)
+                ts = datetime.now(timezone.utc)
+            if 'messages' in entry:
+                history.append({'messages': entry['messages'], 'timestamp': ts})
+            elif 'user' in entry and 'assistant' in entry:
+                history.append(
+                    {
+                        'messages': [
+                            {'role': 'user', 'content': entry['user']},
+                            {'role': 'assistant', 'content': entry['assistant']},
+                        ],
+                        'timestamp': ts,
+                    }
+                )
         return history
 
     def _save_history(self):
         serializable = [
             {
-                'user': e['user'],
-                'assistant': e['assistant'],
+                'messages': e['messages'],
                 'timestamp': e['timestamp'].isoformat(),
             }
             for e in self._conversation_history
         ]
-        get_storage().set_value(BOT_HISTORY_KEY, serializable)
+        self._bot_state['conversation_history'] = serializable
+        _save_bot_state(self._bot_state)
 
     def _telegram_api(self, method, **kwargs):
         url = f'https://api.telegram.org/bot{self._bot_token}/{method}'
@@ -740,7 +770,8 @@ class TelegramBot:
         }
 
     def _save_memory_to_storage(self):
-        get_storage().set_value(BOT_MEMORY_KEY, self._memory)
+        self._bot_state['memory'] = self._memory
+        _save_bot_state(self._bot_state)
 
     def _tool_save_memory(self, key, value):
         self._memory[key] = value
@@ -773,8 +804,10 @@ class TelegramBot:
         entry_count = len(self._conversation_history)
         self._conversation_history = [
             {
-                'user': '(previous conversation summary)',
-                'assistant': summary,
+                'messages': [
+                    {'role': 'user', 'content': '(previous conversation summary)'},
+                    {'role': 'assistant', 'content': summary},
+                ],
                 'timestamp': datetime.now(timezone.utc),
             }
         ]
@@ -816,10 +849,20 @@ class TelegramBot:
             lines = [f'💬 **Conversation history** ({len(self._conversation_history)} entries):']
             for entry in self._conversation_history:
                 ts = entry['timestamp'].strftime('%H:%M')
-                user_msg = entry['user']
-                assistant_msg = entry['assistant']
+                msgs = entry['messages']
+                user_msg = next((m['content'][:200] for m in msgs if m['role'] == 'user'), '?')
+                assistant_msg = next(
+                    (
+                        m['content'][:200]
+                        for m in reversed(msgs)
+                        if m['role'] == 'assistant' and m.get('content')
+                    ),
+                    '?',
+                )
+                tool_count = sum(1 for m in msgs if m['role'] == 'tool')
+                tool_info = f' [{tool_count} tool calls]' if tool_count else ''
                 lines.append(f'[{ts}] User: {user_msg}')
-                lines.append(f'[{ts}] Bot: {assistant_msg}')
+                lines.append(f'[{ts}] Bot: {assistant_msg}{tool_info}')
             return '\n'.join(lines)
         elif command == '/tasks':
             return str(self._tool_list_tasks())
@@ -843,10 +886,11 @@ class TelegramBot:
             },
         ]
         for entry in self._conversation_history:
-            messages.append({'role': 'user', 'content': entry['user']})
-            messages.append({'role': 'assistant', 'content': entry['assistant']})
+            messages.extend(entry['messages'])
         text = f'The current time is: {current_time}\n{text}'
         messages.append({'role': 'user', 'content': text})
+
+        turn_messages = [{'role': 'user', 'content': text}]
 
         try:
             for _iteration in range(100):
@@ -861,7 +905,9 @@ class TelegramBot:
                 choice = response.choices[0]
 
                 if choice.message.tool_calls:
-                    messages.append(choice.message)
+                    assistant_msg = self._serialize_assistant_message(choice.message)
+                    messages.append(assistant_msg)
+                    turn_messages.append(assistant_msg)
                     for tool_call in choice.message.tool_calls:
                         args = json.loads(tool_call.function.arguments)
                         bot_tool_call_message = (
@@ -870,20 +916,20 @@ class TelegramBot:
                         logger.info(bot_tool_call_message)
                         self._send_message(bot_tool_call_message)
                         result = self._execute_tool(tool_call.function.name, args)
-                        messages.append(
-                            {
-                                'role': 'tool',
-                                'tool_call_id': tool_call.id,
-                                'content': json.dumps(result),
-                            }
-                        )
+                        tool_msg = {
+                            'role': 'tool',
+                            'tool_call_id': tool_call.id,
+                            'content': json.dumps(result),
+                        }
+                        messages.append(tool_msg)
+                        turn_messages.append(tool_msg)
                     continue
 
                 reply = choice.message.content or 'Done.'
+                turn_messages.append({'role': 'assistant', 'content': reply})
                 self._conversation_history.append(
                     {
-                        'user': text,
-                        'assistant': reply,
+                        'messages': turn_messages,
                         'timestamp': datetime.now(timezone.utc),
                     }
                 )
@@ -894,6 +940,25 @@ class TelegramBot:
         except Exception as e:
             logger.exception(f'Telegram bot AI processing failed: {e}', exc_info=e)
             return f'Error processing your request: {e}'
+
+    @staticmethod
+    def _serialize_assistant_message(message):
+        msg = {'role': 'assistant'}
+        if message.content:
+            msg['content'] = message.content
+        if message.tool_calls:
+            msg['tool_calls'] = [
+                {
+                    'id': tc.id,
+                    'type': 'function',
+                    'function': {
+                        'name': tc.function.name,
+                        'arguments': tc.function.arguments,
+                    },
+                }
+                for tc in message.tool_calls
+            ]
+        return msg
 
     def _should_send_proactive_update(self):
         tz = gettz(self._user_timezone)
@@ -943,7 +1008,8 @@ class TelegramBot:
         had_messages = False
         for update in updates:
             self._update_offset = update['update_id'] + 1
-            get_storage().set_value(BOT_UPDATE_OFFSET_KEY, self._update_offset)
+            self._bot_state['update_offset'] = self._update_offset
+            _save_bot_state(self._bot_state)
             message = update.get('message', {})
             chat_id = str(message.get('chat', {}).get('id', ''))
             text = message.get('text', '')
