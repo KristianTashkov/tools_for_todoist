@@ -72,7 +72,6 @@ TOOLS = [
             'properties': {
                 'project_name': {
                     'type': 'string',
-                    'minLength': 1,
                     'description': (
                         'Only include to filter by a specific project name (exact match). '
                         'Omit to return tasks from all projects.'
@@ -80,7 +79,6 @@ TOOLS = [
                 },
                 'label': {
                     'type': 'string',
-                    'minLength': 1,
                     'description': (
                         'Only include to filter by a specific label. '
                         'Omit to return tasks with any/no labels.'
@@ -95,7 +93,6 @@ TOOLS = [
                 },
                 'due_after': {
                     'type': 'string',
-                    'minLength': 1,
                     'description': (
                         'Only include tasks with due date after this date. '
                         'Date should be in ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS) '
@@ -104,7 +101,6 @@ TOOLS = [
                 },
                 'due_before': {
                     'type': 'string',
-                    'minLength': 1,
                     'description': (
                         'Only include tasks with due date before this date. '
                         'Date should be in ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS) '
@@ -120,7 +116,6 @@ TOOLS = [
                 },
             },
             'required': [],
-            'additionalProperties': False,
         },
     },
     {
