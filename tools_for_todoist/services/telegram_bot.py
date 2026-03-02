@@ -20,7 +20,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import date, datetime
 
 import requests
 from dateutil.tz import gettz
@@ -95,7 +95,7 @@ TOOLS = [
                     'type': 'string',
                     'description': (
                         'Only include tasks with due date after this date. '
-                        'Date should be in ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS) '
+                        'Date should be in ISO format (YYYY-MM-DDTHH:MM:SS) '
                         'in user timezone.'
                     ),
                 },
@@ -103,7 +103,7 @@ TOOLS = [
                     'type': 'string',
                     'description': (
                         'Only include tasks with due date before this date. '
-                        'Date should be in ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS) '
+                        'Date should be in ISO format (YYYY-MM-DDTHH:MM:SS) '
                         'in user timezone.'
                     ),
                 },
@@ -441,9 +441,7 @@ class TelegramBot:
     def _record_proactive_message(self, role, content):
         """Append a message to the most recent proactive conversation group."""
         if self._proactive_conversations:
-            self._proactive_conversations[-1]['messages'].append(
-                {'role': role, 'content': content}
-            )
+            self._proactive_conversations[-1]['messages'].append({'role': role, 'content': content})
 
     def _telegram_api(self, method, params):
         url = f'https://api.telegram.org/bot{self._bot_token}/{method}'
@@ -451,13 +449,15 @@ class TelegramBot:
         response.raise_for_status()
         return response.json()
 
-    def _send_message(self, text):
+    def _send_message(self, text, parse_mode=None):
         # Telegram message limit is 4096 chars
         original_text = str(text)
         try:
             while text:
                 chunk, text = text[:4000], text[4000:]
                 params = dict(chat_id=self._chat_id, text=chunk)
+                if parse_mode is not None:
+                    params['parse_mode'] = parse_mode
                 self._telegram_api('sendMessage', params)
         except HTTPError as e:
             logger.error(f'Failed to send Telegram message: "{original_text}", {e}')
@@ -558,19 +558,23 @@ class TelegramBot:
             if with_due_date_only and next_due_date is None:
                 continue
             if next_due_date is not None and due_after:
+                if isinstance(next_due_date, date):
+                    next_due_date = datetime.combine(next_due_date, datetime.min.time())
                 try:
                     due_after_dt = datetime.fromisoformat(due_after)
                     if next_due_date < due_after_dt:
                         continue
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f'Invalid due_before/due_after format: {e}')
             if next_due_date is not None and due_before:
+                if isinstance(next_due_date, date):
+                    next_due_date = datetime.combine(next_due_date, datetime.min.time())
                 try:
                     due_before_dt = datetime.fromisoformat(due_before)
                     if next_due_date > due_before_dt:
                         continue
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f'Invalid due_before/due_after format: {e}')
             task_dict = self._task_to_dict(item)
             if item.is_completed():
                 task_dict['completed'] = True
@@ -812,6 +816,15 @@ class TelegramBot:
         if command == '/shutdown':
             self._send_message('Shutting down. Bye! 👋')
             os._exit(0)
+        elif command.startswith('/execute'):
+            _, _, tool_info = command.partition(' ')
+            tool_name, _, args = tool_info.partition(' ')
+            try:
+                args = json.loads(args.replace('\'', '"')) if args else {}
+            except json.JSONDecodeError:
+                return f'❌ Invalid JSON arguments for /execute command: {command}.'
+            result = self._execute_tool(tool_name, args)
+            return f'✅ Executed tool "{tool_name}" with result:\n{json.dumps(result, indent=2)}'
         elif command == '/summary':
             self._send_proactive_update()
             return '📊 Summary update sent.'
@@ -848,9 +861,7 @@ class TelegramBot:
         if is_proactive:
             # Get context from previous proactive conversations before creating new one
             context_messages = self._get_proactive_context()
-            self._proactive_conversations.append(
-                {'timestamp': now.isoformat(), 'messages': []}
-            )
+            self._proactive_conversations.append({'timestamp': now.isoformat(), 'messages': []})
             self._proactive_conversations = self._proactive_conversations[-3:]
             self._last_response_id = None
             input_messages = context_messages + [{'role': 'user', 'content': user_text}]
@@ -928,16 +939,14 @@ class TelegramBot:
 
         prompt = (
             '(Automated status check) '
-            'Please give me a status update. Review my tasks due in the next 7 days and tell me:\n'
+            'Please give me a status update for today only. '
+            'Review my tasks due in the next 7 days and tell me:\n'
             '1. Any overdue tasks that need immediate attention\n'
             '2. Upcoming meetings or important tasks in the next few hours\n'
-            '3. Tasks I might be procrastinating on\n'
-            '4. Any helpful reminders\n\n'
+            '3. Brief helpful reminders of important (not ALL!) non daily/weekly tasks '
+            'in the coming days\n\n'
             'Be concise but firm about important things. Increase urgency for tasks '
             "you know I've been putting off.\n"
-            "Recurring tasks include a 'completed_at' field showing when they were last "
-            "completed. Use it to detect procrastination patterns and "
-            "call those out in the update.\n"
             'If this is a follow-up update, don\'t repeat information from the last '
             'update unless the situation has changed or it\'s urgent enough to re-emphasize.\n'
         )
