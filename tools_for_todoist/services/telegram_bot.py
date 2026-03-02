@@ -454,7 +454,7 @@ class TelegramBot:
         original_text = str(text)
         try:
             while text:
-                chunk, text = text[:4000], text[4000:]
+                chunk, text = text[:2500], text[2500:]
                 params = dict(chat_id=self._chat_id, text=chunk)
                 if parse_mode is not None:
                     params['parse_mode'] = parse_mode
@@ -940,10 +940,9 @@ class TelegramBot:
         prompt = (
             '(Automated status check) '
             'Please give me a status update for today only. '
-            'Review my tasks due in the next 7 days and tell me:\n'
             '1. Any overdue tasks that need immediate attention\n'
             '2. Upcoming meetings or important tasks in the next few hours\n'
-            '3. Brief helpful reminders of important (not ALL!) non daily/weekly tasks '
+            '3. Brief helpful reminders of important (top 3 items) non daily/weekly tasks '
             'in the coming days\n\n'
             'Be concise but firm about important things. Increase urgency for tasks '
             "you know I've been putting off.\n"
