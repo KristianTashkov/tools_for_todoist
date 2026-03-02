@@ -20,7 +20,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 import json
 import logging
 import os
-from datetime import date, datetime
+from datetime import datetime
 
 import requests
 from dateutil.tz import gettz
@@ -91,22 +91,22 @@ TOOLS = [
                         'Omit or false to include all tasks.'
                     ),
                 },
-                'due_after': {
-                    'type': 'string',
-                    'description': (
-                        'Only include tasks with due date after this date. '
-                        'Date should be in ISO format (YYYY-MM-DDTHH:MM:SS) '
-                        'in user timezone.'
-                    ),
-                },
-                'due_before': {
-                    'type': 'string',
-                    'description': (
-                        'Only include tasks with due date before this date. '
-                        'Date should be in ISO format (YYYY-MM-DDTHH:MM:SS) '
-                        'in user timezone.'
-                    ),
-                },
+                # 'due_after': {
+                #     'type': 'string',
+                #     'description': (
+                #         'Only include tasks with due date after this date. '
+                #         'Date should be in ISO format (Y-MM-DD or YYYY-MM-DDTHH:MM:SS) '
+                #         'in user timezone.'
+                #     ),
+                # },
+                # 'due_before': {
+                #     'type': 'string',
+                #     'description': (
+                #         'Only include tasks with due date before this date. '
+                #         'Date should be in ISO format (YYYY-MM-DDTHH:MM:SS) '
+                #         'in user timezone.'
+                #     ),
+                # },
                 'include_completed': {
                     'type': 'boolean',
                     'description': (
@@ -454,7 +454,7 @@ class TelegramBot:
         original_text = str(text)
         try:
             while text:
-                chunk, text = text[:2500], text[2500:]
+                chunk, text = text[:4000], text[4000:]
                 params = dict(chat_id=self._chat_id, text=chunk)
                 if parse_mode is not None:
                     params['parse_mode'] = parse_mode
@@ -558,8 +558,6 @@ class TelegramBot:
             if with_due_date_only and next_due_date is None:
                 continue
             if next_due_date is not None and due_after:
-                if isinstance(next_due_date, date):
-                    next_due_date = datetime.combine(next_due_date, datetime.min.time())
                 try:
                     due_after_dt = datetime.fromisoformat(due_after)
                     if next_due_date < due_after_dt:
@@ -567,8 +565,6 @@ class TelegramBot:
                 except Exception as e:
                     logger.warning(f'Invalid due_before/due_after format: {e}')
             if next_due_date is not None and due_before:
-                if isinstance(next_due_date, date):
-                    next_due_date = datetime.combine(next_due_date, datetime.min.time())
                 try:
                     due_before_dt = datetime.fromisoformat(due_before)
                     if next_due_date > due_before_dt:
@@ -820,7 +816,7 @@ class TelegramBot:
             _, _, tool_info = command.partition(' ')
             tool_name, _, args = tool_info.partition(' ')
             try:
-                args = json.loads(args.replace('\'', '"')) if args else {}
+                args = json.loads(args) if args else {}
             except json.JSONDecodeError:
                 return f'❌ Invalid JSON arguments for /execute command: {command}.'
             result = self._execute_tool(tool_name, args)
@@ -938,21 +934,22 @@ class TelegramBot:
         self._last_proactive_hour = (now.date(), now.hour)
 
         prompt = (
-            '(Automated status check) '
-            'Please give me a status update for today only. '
+            'Please give me a status update. Review my tasks and tell me:\n'
             '1. Any overdue tasks that need immediate attention\n'
             '2. Upcoming meetings or important tasks in the next few hours\n'
-            '3. Brief helpful reminders of important (top 3 items) non daily/weekly tasks '
-            'in the coming days\n\n'
+            '3. Tasks I might be procrastinating\n'
+            '4. Any helpful reminders\n\n'
             'Be concise but firm about important things. Increase urgency for tasks '
             "you know I've been putting off.\n"
+            "Recurring tasks include a 'completed_at' field showing when they were last "
+            "completed. Use it to detect procrastination patterns and "
+            "call those out in the update.\n"
             'If this is a follow-up update, don\'t repeat information from the last '
             'update unless the situation has changed or it\'s urgent enough to re-emphasize.\n'
         )
-
         logger.info('Sending proactive update')
         response = self._process_message(prompt, reasoning_level='high', is_proactive=True)
-        self._send_message(response)
+        self._send_message(response, parse_mode='Markdown')
 
     def poll(self):
         if not self.is_configured:
@@ -979,7 +976,7 @@ class TelegramBot:
                 self._send_message(service_response)
             else:
                 response = self._process_message(text, reasoning_level='medium')
-                self._send_message(response)
+                self._send_message(response, parse_mode='Markdown')
 
         if self._should_send_proactive_update():
             self._send_proactive_update()
