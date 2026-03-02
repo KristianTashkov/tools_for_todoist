@@ -72,6 +72,7 @@ TOOLS = [
             'properties': {
                 'project_name': {
                     'type': 'string',
+                    'minLength': 1,
                     'description': (
                         'Only include to filter by a specific project name (exact match). '
                         'Omit to return tasks from all projects.'
@@ -79,6 +80,7 @@ TOOLS = [
                 },
                 'label': {
                     'type': 'string',
+                    'minLength': 1,
                     'description': (
                         'Only include to filter by a specific label. '
                         'Omit to return tasks with any/no labels.'
@@ -91,6 +93,24 @@ TOOLS = [
                         'Omit or false to include all tasks.'
                     ),
                 },
+                'due_after': {
+                    'type': 'string',
+                    'minLength': 1,
+                    'description': (
+                        'Only include tasks with due date after this date. '
+                        'Date should be in ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS) '
+                        'in user timezone.'
+                    ),
+                },
+                'due_before': {
+                    'type': 'string',
+                    'minLength': 1,
+                    'description': (
+                        'Only include tasks with due date before this date. '
+                        'Date should be in ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS) '
+                        'in user timezone.'
+                    ),
+                },
                 'include_completed': {
                     'type': 'boolean',
                     'description': (
@@ -100,6 +120,7 @@ TOOLS = [
                 },
             },
             'required': [],
+            'additionalProperties': False,
         },
     },
     {
@@ -472,7 +493,13 @@ class TelegramBot:
         return {'error': f'Unknown tool: {name}'}
 
     def _tool_list_tasks(
-        self, project_name=None, label=None, with_due_date_only=False, include_completed=False
+        self,
+        project_name=None,
+        label=None,
+        due_after=None,
+        due_before=None,
+        with_due_date_only=False,
+        include_completed=False,
     ):
         project_name = project_name or None
         label = label or None
@@ -486,8 +513,23 @@ class TelegramBot:
                     continue
             if label and label not in item.labels():
                 continue
-            if with_due_date_only and item.next_due_date() is None:
+            next_due_date = item.next_due_date()
+            if with_due_date_only and next_due_date is None:
                 continue
+            if next_due_date is not None and due_after:
+                try:
+                    due_after_dt = datetime.fromisoformat(due_after)
+                    if next_due_date < due_after_dt:
+                        continue
+                except Exception:
+                    pass
+            if next_due_date is not None and due_before:
+                try:
+                    due_before_dt = datetime.fromisoformat(due_before)
+                    if next_due_date > due_before_dt:
+                        continue
+                except Exception:
+                    pass
             task_dict = self._task_to_dict(item)
             if item.is_completed():
                 task_dict['completed'] = True
@@ -774,6 +816,7 @@ class TelegramBot:
                 }
                 if self._last_response_id:
                     kwargs['previous_response_id'] = self._last_response_id
+                    kwargs.pop('instructions')
 
                 response = self._openai_client.responses.create(**kwargs)
                 logger.debug(f'Response usage: {response.usage}')
@@ -817,18 +860,17 @@ class TelegramBot:
             return False
         return True
 
-    def _send_proactive_update(self, context='hourly'):
+    def _send_proactive_update(self):
         tz = gettz(self._user_timezone)
         now = datetime.now(tz)
         self._last_proactive_hour = (now.date(), now.hour)
 
-        current_tasks = self._tool_list_tasks(with_due_date_only=True)
         prompt = (
-            f'(Automated {context} update) '
-            'Please give me a status update. Review my tasks and tell me:\n'
+            '(Automated status check) '
+            'Please give me a status update. Review my tasks due in the next 7 days and tell me:\n'
             '1. Any overdue tasks that need immediate attention\n'
             '2. Upcoming meetings or important tasks in the next few hours\n'
-            '3. Tasks I might be procrastinating\n'
+            '3. Tasks I might be procrastinating on\n'
             '4. Any helpful reminders\n\n'
             'Be concise but firm about important things. Increase urgency for tasks '
             "you know I've been putting off.\n"
@@ -837,10 +879,9 @@ class TelegramBot:
             "call those out in the update.\n"
             'If this is a follow-up update, don\'t repeat information from the last '
             'update unless the situation has changed or it\'s urgent enough to re-emphasize.\n'
-            f"Current Tasks state: {current_tasks}"
         )
 
-        logger.info(f'Sending proactive {context} update')
+        logger.info('Sending proactive update')
         response = self._process_message(prompt, reasoning_level='high')
         self._send_message(response)
 
