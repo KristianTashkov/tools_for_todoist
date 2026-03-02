@@ -379,6 +379,8 @@ class TelegramBot:
         self._bot_state = _load_bot_state()
         self._update_offset = self._bot_state.get('update_offset')
         self._last_response_id = self._bot_state.get('last_response_id')
+        self._last_interaction_time = self._bot_state.get('last_interaction_time')
+        self._proactive_conversations = self._bot_state.get('proactive_conversations', [])
         self._openai_client = None
         self._memory = self._bot_state.get('memory', {})
         self._last_proactive_hour = None
@@ -396,13 +398,57 @@ class TelegramBot:
     def is_configured(self):
         return self._openai_client is not None
 
-    def _save_response_id(self):
+    def _save_conversation_state(self):
         self._bot_state['last_response_id'] = self._last_response_id
+        self._bot_state['last_interaction_time'] = self._last_interaction_time
+        self._bot_state['proactive_conversations'] = self._proactive_conversations
         _save_bot_state(self._bot_state)
 
     def _clear_conversation(self):
         self._last_response_id = None
-        self._save_response_id()
+        self._last_interaction_time = None
+        self._proactive_conversations = []
+        self._save_conversation_state()
+
+    def _is_conversation_fresh(self):
+        """Return True if last interaction was within 1 hour."""
+        if not self._last_interaction_time or not self._last_response_id:
+            return False
+        try:
+            last_time = datetime.fromisoformat(self._last_interaction_time)
+            tz = gettz(self._user_timezone)
+            now = datetime.now(tz)
+            return (now - last_time).total_seconds() < 3600
+        except (ValueError, TypeError):
+            return False
+
+    def _is_within_proactive_window(self):
+        """Return True if current time is within 1 hour of the last proactive update."""
+        if not self._proactive_conversations:
+            return False
+        last = self._proactive_conversations[-1]
+        try:
+            proactive_time = datetime.fromisoformat(last['timestamp'])
+            tz = gettz(self._user_timezone)
+            now = datetime.now(tz)
+            return (now - proactive_time).total_seconds() < 3600
+        except (ValueError, TypeError, KeyError):
+            return False
+
+    def _get_proactive_context(self):
+        """Build input messages from the last 3 proactive conversation groups."""
+        messages = []
+        for conv in self._proactive_conversations[-3:]:
+            for msg in conv.get('messages', []):
+                messages.append({'role': msg['role'], 'content': msg['content']})
+        return messages
+
+    def _record_proactive_message(self, role, content):
+        """Append a message to the most recent proactive conversation group."""
+        if self._proactive_conversations:
+            self._proactive_conversations[-1]['messages'].append(
+                {'role': role, 'content': content}
+            )
 
     def _telegram_api(self, method, params):
         url = f'https://api.telegram.org/bot{self._bot_token}/{method}'
@@ -796,14 +842,31 @@ class TelegramBot:
             projects=self._format_projects(),
         )
 
-    def _process_message(self, text: str, reasoning_level: str):
+    def _process_message(self, text: str, reasoning_level: str, is_proactive=False):
         instructions = self._build_instructions()
 
         tz = gettz(self._user_timezone)
         now = datetime.now(tz)
         current_time = now.strftime('%H:%M on %A, %B %d, %Y')
-        text += f'\nThe current time is: {current_time}'
-        input_messages = [{'role': 'user', 'content': text}]
+        user_text = text + f'\nThe current time is: {current_time}'
+
+        if is_proactive:
+            # Get context from previous proactive conversations before creating new one
+            context_messages = self._get_proactive_context()
+            self._proactive_conversations.append(
+                {'timestamp': now.isoformat(), 'messages': []}
+            )
+            self._proactive_conversations = self._proactive_conversations[-3:]
+            self._last_response_id = None
+            input_messages = context_messages + [{'role': 'user', 'content': user_text}]
+            self._record_proactive_message('user', text)
+        else:
+            input_messages = [{'role': 'user', 'content': user_text}]
+            if self._is_within_proactive_window():
+                self._record_proactive_message('user', text)
+            if not self._is_conversation_fresh():
+                self._last_response_id = None
+
         try:
             for _iteration in range(100):
                 kwargs = {
@@ -840,7 +903,10 @@ class TelegramBot:
 
                 reply = response.output_text or 'Done.'
                 self._last_response_id = response.id
-                self._save_response_id()
+                self._last_interaction_time = now.isoformat()
+                if is_proactive or self._is_within_proactive_window():
+                    self._record_proactive_message('assistant', reply)
+                self._save_conversation_state()
                 return reply
 
             return 'Sorry, I hit the maximum number of steps. Please try a simpler request.'
@@ -882,7 +948,7 @@ class TelegramBot:
         )
 
         logger.info('Sending proactive update')
-        response = self._process_message(prompt, reasoning_level='high')
+        response = self._process_message(prompt, reasoning_level='high', is_proactive=True)
         self._send_message(response)
 
     def poll(self):
