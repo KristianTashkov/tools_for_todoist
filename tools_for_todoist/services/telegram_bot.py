@@ -59,6 +59,7 @@ OPENAI_API_KEY = 'telegram_bot.openai_api_key'
 OPENAI_MODEL = 'telegram_bot.openai_model'
 
 TOOLS = [
+    {"type": "web_search"},
     {
         'type': 'function',
         'name': 'list_tasks',
@@ -934,18 +935,19 @@ class TelegramBot:
         self._last_proactive_hour = (now.date(), now.hour)
 
         prompt = (
-            'Please give me a status update. Review my tasks and tell me:\n'
+            'Please give me an hourly status update. Review my tasks and tell me:\n'
             '1. Any overdue tasks that need immediate attention\n'
             '2. Upcoming meetings or important tasks in the next few hours\n'
-            '3. Tasks I might be procrastinating\n'
-            '4. Any helpful reminders\n\n'
+            '3. Tasks I might be procrastinating on\n'
+            '4. Any helpful reminders and tips\n\n'
             'Be concise but firm about important things. Increase urgency for tasks '
             "you know I've been putting off.\n"
-            "Recurring tasks include a 'completed_at' field showing when they were last "
-            "completed. Use it to detect procrastination patterns and "
-            "call those out in the update.\n"
-            'If this is a follow-up update, don\'t repeat information from the last '
-            'update unless the situation has changed or it\'s urgent enough to re-emphasize.\n'
+            'Don\'t repeat information from the last update unless the situation has changed or '
+            'it\'s urgent enough to re-emphasize.\n'
+            '* Morning updates should include a brief summary of top 3 global news stories\n'
+            '* ~12:00 to ~20:00 updates should include the price updates for NVDA/SPY/IMAE:AMS\n'
+            '* Midnight updates should include an overview of tasks the next day and '
+            'top 3 items coming up in the week\n'
         )
         logger.info('Sending proactive update')
         response = self._process_message(prompt, reasoning_level='high', is_proactive=True)
