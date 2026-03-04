@@ -455,11 +455,18 @@ class TelegramBot:
         original_text = str(text)
         try:
             while text:
-                chunk, text = text[:4000], text[4000:]
+                chunk, text = text[:2000], text[2000:]
                 params = dict(chat_id=self._chat_id, text=chunk)
                 if parse_mode is not None:
                     params['parse_mode'] = parse_mode
-                self._telegram_api('sendMessage', params)
+                try:
+                    self._telegram_api('sendMessage', params)
+                except HTTPError:
+                    if parse_mode is not None:
+                        del params['parse_mode']
+                        self._telegram_api('sendMessage', params)
+                    else:
+                        raise
         except HTTPError as e:
             logger.error(f'Failed to send Telegram message: "{original_text}", {e}')
             raise
