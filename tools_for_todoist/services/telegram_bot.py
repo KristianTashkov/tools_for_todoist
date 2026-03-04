@@ -484,6 +484,7 @@ class TelegramBot:
             'project_id': item.project_id,
             'priority': item.priority,
             'labels': list(item.labels()),
+            'duration': item._raw.get('duration'),
         }
         if item.section_id:
             result['section_id'] = item.section_id
@@ -507,11 +508,9 @@ class TelegramBot:
             result['timezone'] = item._due['timezone']
         if item.is_recurring():
             result['is_recurring'] = True
-        raw = item.raw() or {}
-        completed_at = raw.get('completed_at')
-        if completed_at:
-            result['completed_at'] = completed_at
-        responsible_uid = raw.get('responsible_uid')
+        if item.completed_at:
+            result['completed_at'] = item.completed_at
+        responsible_uid = (item.raw() or {}).get('responsible_uid')
         if responsible_uid:
             collaborator = self.todoist._collaborators.get(responsible_uid, {})
             result['assigned_to'] = collaborator.get('full_name', responsible_uid)
@@ -853,7 +852,7 @@ class TelegramBot:
         tz = gettz(self._user_timezone)
         now = datetime.now(tz)
         current_time = now.strftime('%H:%M on %A, %B %d, %Y')
-        user_text = text + f'\nThe current time is: {current_time}'
+        text = text + f'\nThe current time is: {current_time}'
 
         if is_proactive:
             # Get context from previous proactive conversations before creating new one
@@ -861,10 +860,10 @@ class TelegramBot:
             self._proactive_conversations.append({'timestamp': now.isoformat(), 'messages': []})
             self._proactive_conversations = self._proactive_conversations[-3:]
             self._last_response_id = None
-            input_messages = context_messages + [{'role': 'user', 'content': user_text}]
+            input_messages = context_messages + [{'role': 'user', 'content': text}]
             self._record_proactive_message('user', text)
         else:
-            input_messages = [{'role': 'user', 'content': user_text}]
+            input_messages = [{'role': 'user', 'content': text}]
             if self._is_within_proactive_window():
                 self._record_proactive_message('user', text)
             if not self._is_conversation_fresh():
@@ -944,6 +943,10 @@ class TelegramBot:
             '4. Any helpful reminders and tips\n\n'
             'Be concise but firm about important things. Increase urgency for tasks '
             "you know I've been putting off.\n"
+            "Recurring tasks have a 'completed_at' field showing when they were last "
+            'completed. Compare it with the due date to detect procrastination: if a recurring '
+            'task is due today but was last completed days ago (or never), call that out. '
+            'If completed_at is missing, the task has never been completed recently.\n'
             'Don\'t repeat information from the last update unless the situation has changed or '
             'it\'s urgent enough to re-emphasize.\n'
         )

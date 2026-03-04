@@ -44,6 +44,7 @@ class TodoistItem:
         self._in_history = False
         self._labels = set()
         self._last_set_description = None
+        self.completed_at = None
 
     def raw(self):
         return self._raw
@@ -66,6 +67,7 @@ class TodoistItem:
         self.section_id = self._raw.get('section_id')
         self._labels = set(self._raw['labels'])
         self._duration = self._raw['duration']
+        self.completed_at = self._raw.get('completed_at') or self.completed_at
 
     def duration(self):
         return self._duration.copy()

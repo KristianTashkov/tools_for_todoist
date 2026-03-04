@@ -152,16 +152,49 @@ class Todoist:
                 result = self._fetch_completed_items(project_id, cursor=result['next_cursor'])
                 for item in result.get('items', []):
                     self._items[item['id']] = TodoistItem.from_raw(self, item)
-        activity_result = self._activity_sync(limit=1)
-        if activity_result['results']:
-            self._last_completed = activity_result['results'][0]['id']
+        activity_result = self._activity_sync(limit=50)
+        all_events = list(activity_result['results'])
+        if all_events:
+            self._last_completed = all_events[0]['id']
+        cursor = activity_result.get('next_cursor')
+        for _ in range(9):
+            if cursor is None:
+                break
+            activity_result = self._activity_sync(cursor=cursor, limit=50)
+            all_events.extend(activity_result['results'])
+            cursor = activity_result.get('next_cursor')
+        self._update_completed_at_from_events(all_events)
+        recurring_with_completion = sum(
+            1 for item in self._items.values() if item.is_recurring() and item.completed_at
+        )
+        logger.info(
+            f'Loaded {len(all_events)} activity events, '
+            f'tracked completed_at for {recurring_with_completion} recurring items'
+        )
         self.owner_id = self._initial_result['user']['id']
+
+    def _update_completed_at_from_events(self, events):
+        """Update completed_at on recurring items from activity events.
+
+        Events are newest-first, so the first event per item is the most recent completion.
+        """
+        seen = set()
+        for event in events:
+            object_id = event.get('object_id')
+            event_date = event.get('event_date')
+            if not object_id or not event_date or object_id in seen:
+                continue
+            seen.add(object_id)
+            item = self._items.get(object_id)
+            if item and item.is_recurring() and not item.is_completed():
+                item.completed_at = event_date
 
     def _new_completed(self):
         finished_processing = False
         cursor = None
         first_event = None
         new_completed = set()
+        all_events = []
 
         while not finished_processing:
             activity_result = self._activity_sync(cursor=cursor)
@@ -175,8 +208,16 @@ class Todoist:
                 if event['id'] == self._last_completed:
                     finished_processing = True
                     break
-
+                all_events.append(event)
                 new_completed.add((event.get('initiator_id'), event['object_id']))
+
+        # Clear completed_at for newly completed items so we pick up fresh timestamps
+        for _, object_id in new_completed:
+            item = self._items.get(object_id)
+            if item and item.is_recurring():
+                item.completed_at = None
+        self._update_completed_at_from_events(all_events)
+
         self._last_completed = first_event
         return new_completed
 
