@@ -18,7 +18,8 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 
 import logging
-from datetime import datetime
+import re
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 from dateutil.tz import gettz
@@ -36,6 +37,33 @@ class NightOwlEnabler:
         self._todoist = todoist
         self._google_calendar = calendar
         self._day_switch_hour = int(get_storage().get_value(NIGHT_OWL_DAY_SWITCH_HOUR, 4))
+        self._day_switch_timezone = self._resolve_day_switch_timezone() or timezone.utc
+
+    def _resolve_day_switch_timezone(self):
+        user = getattr(self._todoist, '_initial_result', {}).get('user', {})
+        tz_info = user.get('tz_info', {})
+
+        for tz_name in (tz_info.get('timezone'), tz_info.get('gmt_string')):
+            if not tz_name:
+                continue
+            parsed = gettz(tz_name)
+            if parsed is not None:
+                return parsed
+
+            gmt_offset = re.match(r'^\s*GMT\s*([+-])\s*(\d{1,2})(?::(\d{2}))?\s*$', tz_name)
+            if gmt_offset is not None:
+                sign = 1 if gmt_offset.group(1) == '+' else -1
+                hours = int(gmt_offset.group(2))
+                minutes = int(gmt_offset.group(3) or 0)
+                return timezone(sign * timedelta(hours=hours, minutes=minutes))
+
+        hours = tz_info.get('hours')
+        minutes = tz_info.get('minutes')
+        if isinstance(hours, int) and isinstance(minutes, int):
+            sign = -1 if hours < 0 else 1
+            return timezone(sign * timedelta(hours=abs(hours), minutes=abs(minutes)))
+
+        return gettz(self._google_calendar.default_timezone)
 
     def on_todoist_sync(self, sync_result: Dict[str, Any]) -> bool:
         should_sync = False
@@ -50,7 +78,7 @@ class NightOwlEnabler:
                 continue
 
             logger.info(f'NightOwl: Completed every day task: {item}')
-            now = datetime.now(gettz(self._google_calendar.default_timezone))
+            now = datetime.now(self._day_switch_timezone)
             seconds_from_midnight = (now - now.replace(hour=0, minute=0, second=0)).total_seconds()
             if seconds_from_midnight / 3600 > self._day_switch_hour:
                 logger.info(f'NightOwl: Completed after day switch hour, skipping: {item}')
