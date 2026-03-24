@@ -20,7 +20,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 import logging
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from dateutil.tz import gettz
 
@@ -39,13 +39,33 @@ class NightOwlEnabler:
         self._day_switch_hour = int(get_storage().get_value(NIGHT_OWL_DAY_SWITCH_HOUR, 4))
         self._day_switch_timezone = self._resolve_day_switch_timezone() or timezone.utc
 
-    def _resolve_day_switch_timezone(self):
-        user = getattr(self._todoist, '_initial_result', {}).get('user', {})
-        tz_info = user.get('tz_info', {})
+    def _get_todoist_tz_info(self, sync_result: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        if isinstance(sync_result, dict):
+            raw = sync_result.get('raw')
+            if isinstance(raw, dict):
+                user = raw.get('user')
+                if isinstance(user, dict):
+                    tz_info = user.get('tz_info')
+                    if isinstance(tz_info, dict):
+                        return tz_info
+
+        initial_result = getattr(self._todoist, '_initial_result', None)
+        if isinstance(initial_result, dict):
+            user = initial_result.get('user')
+            if isinstance(user, dict):
+                tz_info = user.get('tz_info')
+                if isinstance(tz_info, dict):
+                    return tz_info
+
+        return {}
+
+    def _resolve_day_switch_timezone(self, sync_result: Optional[Dict[str, Any]] = None):
+        tz_info = self._get_todoist_tz_info(sync_result)
 
         for tz_name in (tz_info.get('timezone'), tz_info.get('gmt_string')):
-            if not tz_name:
+            if not isinstance(tz_name, str) or not tz_name.strip():
                 continue
+
             parsed = gettz(tz_name)
             if parsed is not None:
                 return parsed
@@ -66,6 +86,12 @@ class NightOwlEnabler:
         return gettz(self._google_calendar.default_timezone)
 
     def on_todoist_sync(self, sync_result: Dict[str, Any]) -> bool:
+        self._day_switch_timezone = (
+            self._resolve_day_switch_timezone(sync_result)
+            or self._day_switch_timezone
+            or timezone.utc
+        )
+
         should_sync = False
         for _, item_id in sync_result['completed']:
             item = self._todoist.get_item_by_id(item_id)

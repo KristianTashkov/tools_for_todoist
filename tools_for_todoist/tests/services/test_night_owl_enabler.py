@@ -196,3 +196,50 @@ class NightOwlEnablerTests(ServicesTestCase):
                 'timezone': 'Europe/Sofia',
             },
         )
+
+    def test_day_switch_timezone_refreshes_from_sync_user_timezone(self) -> None:
+        self._todoist_mock._initial_result = {
+            'user': {
+                'tz_info': {
+                    'timezone': 'Europe/Zurich',
+                }
+            }
+        }
+        night_owl_enabler = NightOwlEnabler(self._todoist_mock, self._google_calendar_mock)
+
+        offset_before = night_owl_enabler._day_switch_timezone.utcoffset(datetime(2020, 1, 1))
+        night_owl_enabler.on_todoist_sync(
+            {
+                'completed': [],
+                'raw': {
+                    'user': {
+                        'tz_info': {
+                            'timezone': 'Asia/Tokyo',
+                        }
+                    }
+                },
+            }
+        )
+        offset_after = night_owl_enabler._day_switch_timezone.utcoffset(datetime(2020, 1, 1))
+
+        self.assertEqual(offset_before.total_seconds(), 3600)
+        self.assertEqual(offset_after.total_seconds(), 9 * 3600)
+
+    def test_day_switch_timezone_refreshes_from_sync_user_gmt_string(self) -> None:
+        night_owl_enabler = NightOwlEnabler(self._todoist_mock, self._google_calendar_mock)
+
+        night_owl_enabler.on_todoist_sync(
+            {
+                'completed': [],
+                'raw': {
+                    'user': {
+                        'tz_info': {
+                            'gmt_string': 'GMT +5:30',
+                        }
+                    }
+                },
+            }
+        )
+
+        offset = night_owl_enabler._day_switch_timezone.utcoffset(datetime(2020, 1, 1))
+        self.assertEqual(offset.total_seconds(), 5 * 3600 + 30 * 60)
