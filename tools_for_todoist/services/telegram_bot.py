@@ -988,7 +988,7 @@ class TelegramBot:
                 response = self._process_message(text, reasoning_level='medium')
                 self._send_message(response, parse_mode='Markdown')
 
-        if self._should_send_proactive_update():
-            self._send_proactive_update()
+        # if self._should_send_proactive_update():
+        #     self._send_proactive_update()
 
         return had_messages
